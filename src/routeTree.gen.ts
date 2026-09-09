@@ -22,6 +22,7 @@ import { Route as DashboardSettingsEmployeesRouteImport } from './routes/dashboa
 import { Route as DashboardSettingsLookupsRouteImport } from './routes/dashboard/settings/lookups'
 import { Route as DashboardSettingsRolesRouteImport } from './routes/dashboard/settings/roles'
 import { Route as DashboardSettingsRulesRouteImport } from './routes/dashboard/settings/rules'
+import { Route as DashboardSettingsStationsRouteImport } from './routes/dashboard/settings/stations'
 import { Route as DashboardSystemActivityLogsRouteImport } from './routes/dashboard/system/activity-logs'
 import { Route as DashboardSystemAuditLogsRouteImport } from './routes/dashboard/system/audit-logs'
 import { Route as DashboardSystemChangelogRouteImport } from './routes/dashboard/system/changelog'
@@ -97,6 +98,12 @@ const DashboardSettingsRulesRoute = DashboardSettingsRulesRouteImport.update({
   path: '/settings/rules',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSettingsStationsRoute =
+  DashboardSettingsStationsRouteImport.update({
+    id: '/settings/stations',
+    path: '/settings/stations',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardSystemActivityLogsRoute =
   DashboardSystemActivityLogsRouteImport.update({
     id: '/system/activity-logs',
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
   '/dashboard/settings/roles': typeof DashboardSettingsRolesRoute
   '/dashboard/settings/rules': typeof DashboardSettingsRulesRoute
+  '/dashboard/settings/stations': typeof DashboardSettingsStationsRoute
   '/dashboard/system/activity-logs': typeof DashboardSystemActivityLogsRoute
   '/dashboard/system/audit-logs': typeof DashboardSystemAuditLogsRoute
   '/dashboard/system/changelog': typeof DashboardSystemChangelogRoute
@@ -166,6 +174,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
   '/dashboard/settings/roles': typeof DashboardSettingsRolesRoute
   '/dashboard/settings/rules': typeof DashboardSettingsRulesRoute
+  '/dashboard/settings/stations': typeof DashboardSettingsStationsRoute
   '/dashboard/system/activity-logs': typeof DashboardSystemActivityLogsRoute
   '/dashboard/system/audit-logs': typeof DashboardSystemAuditLogsRoute
   '/dashboard/system/changelog': typeof DashboardSystemChangelogRoute
@@ -188,6 +197,7 @@ export interface FileRoutesById {
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
   '/dashboard/settings/roles': typeof DashboardSettingsRolesRoute
   '/dashboard/settings/rules': typeof DashboardSettingsRulesRoute
+  '/dashboard/settings/stations': typeof DashboardSettingsStationsRoute
   '/dashboard/system/activity-logs': typeof DashboardSystemActivityLogsRoute
   '/dashboard/system/audit-logs': typeof DashboardSystemAuditLogsRoute
   '/dashboard/system/changelog': typeof DashboardSystemChangelogRoute
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/lookups'
     | '/dashboard/settings/roles'
     | '/dashboard/settings/rules'
+    | '/dashboard/settings/stations'
     | '/dashboard/system/activity-logs'
     | '/dashboard/system/audit-logs'
     | '/dashboard/system/changelog'
@@ -231,6 +242,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/lookups'
     | '/dashboard/settings/roles'
     | '/dashboard/settings/rules'
+    | '/dashboard/settings/stations'
     | '/dashboard/system/activity-logs'
     | '/dashboard/system/audit-logs'
     | '/dashboard/system/changelog'
@@ -252,6 +264,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/lookups'
     | '/dashboard/settings/roles'
     | '/dashboard/settings/rules'
+    | '/dashboard/settings/stations'
     | '/dashboard/system/activity-logs'
     | '/dashboard/system/audit-logs'
     | '/dashboard/system/changelog'
@@ -359,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRulesRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/settings/stations': {
+      id: '/dashboard/settings/stations'
+      path: '/settings/stations'
+      fullPath: '/dashboard/settings/stations'
+      preLoaderRoute: typeof DashboardSettingsStationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/system/activity-logs': {
       id: '/dashboard/system/activity-logs'
       path: '/system/activity-logs'
@@ -415,6 +435,7 @@ interface DashboardRouteChildren {
   DashboardSettingsLookupsRoute: typeof DashboardSettingsLookupsRoute
   DashboardSettingsRolesRoute: typeof DashboardSettingsRolesRoute
   DashboardSettingsRulesRoute: typeof DashboardSettingsRulesRoute
+  DashboardSettingsStationsRoute: typeof DashboardSettingsStationsRoute
   DashboardSystemActivityLogsRoute: typeof DashboardSystemActivityLogsRoute
   DashboardSystemAuditLogsRoute: typeof DashboardSystemAuditLogsRoute
   DashboardSystemChangelogRoute: typeof DashboardSystemChangelogRoute
@@ -434,6 +455,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSettingsLookupsRoute: DashboardSettingsLookupsRoute,
   DashboardSettingsRolesRoute: DashboardSettingsRolesRoute,
   DashboardSettingsRulesRoute: DashboardSettingsRulesRoute,
+  DashboardSettingsStationsRoute: DashboardSettingsStationsRoute,
   DashboardSystemActivityLogsRoute: DashboardSystemActivityLogsRoute,
   DashboardSystemAuditLogsRoute: DashboardSystemAuditLogsRoute,
   DashboardSystemChangelogRoute: DashboardSystemChangelogRoute,
