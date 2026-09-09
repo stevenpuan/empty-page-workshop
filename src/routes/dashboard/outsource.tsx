@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ExternalLink, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -371,8 +371,8 @@ function Page() {
                     l.status !== "rejected";
                   const open = expanded === l.id;
                   return (
-                    <>
-                      <TableRow key={l.id}>
+                    <Fragment key={l.id}>
+                      <TableRow>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -434,7 +434,7 @@ function Page() {
                         </TableCell>
                       </TableRow>
                       {open && (
-                        <TableRow key={`${l.id}-detail`}>
+                        <TableRow>
                           <TableCell colSpan={11} className="bg-muted/40">
                             <LinkDetail
                               link={l}
@@ -447,7 +447,7 @@ function Page() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })
               )}
