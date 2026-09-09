@@ -394,6 +394,7 @@ function SideLink({
   active,
   onNavigate,
   indent,
+  badge,
 }: {
   to: string;
   icon: string | null;
@@ -401,6 +402,7 @@ function SideLink({
   active: boolean;
   onNavigate?: (() => void) | undefined;
   indent?: boolean | undefined;
+  badge?: number | undefined;
 }) {
   return (
     <Link
