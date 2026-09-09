@@ -261,6 +261,69 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
             </div>
           );
         })}
+        {extraItems.map((item) => (
+          <SideLink
+            key={item.route}
+            to={item.route}
+            icon={item.icon}
+            title={item.title}
+            active={pathname === item.route}
+            onNavigate={onNavigate}
+            badge={item.badge}
+          />
+        ))}
+        {groupsAfter.map((g) => {
+          if (g.route) {
+            if (!visible(g)) return null;
+            return (
+              <SideLink
+                key={g.id}
+                to={g.route}
+                icon={g.icon}
+                title={g.title}
+                active={pathname === g.route}
+                onNavigate={onNavigate}
+              />
+            );
+          }
+          const kids = childrenOf(g.id).filter(visible);
+          if (!kids.length) return null;
+          const open = isOpen(g.menu_key, kids);
+          return (
+            <div key={g.id} className="pt-1">
+              <button
+                type="button"
+                onClick={() => toggle(g.menu_key, kids)}
+                aria-expanded={open}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-base font-semibold text-foreground/80 hover:bg-accent/50 transition-colors"
+              >
+                <Icon name={g.icon} className="w-5 h-5 shrink-0" />
+                <span className="flex-1 text-left truncate">{g.title}</span>
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 shrink-0 transition-transform",
+                    open ? "rotate-0" : "-rotate-90",
+                  )}
+                />
+              </button>
+              {open && (
+                <div className="mt-0.5 space-y-0.5">
+                  {kids.map((k) => (
+                    <SideLink
+                      key={k.id}
+                      to={k.route!}
+                      icon={k.icon}
+                      title={k.title}
+                      active={pathname === k.route}
+                      onNavigate={onNavigate}
+                      indent
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
       <div className="border-t p-3">
         <div className="flex items-center gap-2 px-2 py-1.5">
