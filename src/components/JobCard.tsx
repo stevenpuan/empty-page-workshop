@@ -32,7 +32,7 @@ export function JobCard({
   draggable?: boolean;
   canAssign?: boolean;
   onAssign?: (task: BoardTask) => void;
-  dragProps?: Record<string, unknown>;
+  dragProps?: Record<string, unknown> | undefined;
   overlay?: boolean;
 }) {
   const due = task.orders?.due_date ?? null;

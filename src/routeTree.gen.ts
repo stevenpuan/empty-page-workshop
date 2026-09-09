@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardBoardRouteImport } from './routes/dashboard/board'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard/customers'
 import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
@@ -50,6 +51,11 @@ const LoginRoute = LoginRouteImport.update({
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardBoardRoute = DashboardBoardRouteImport.update({
+  id: '/board',
+  path: '/board',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/board': typeof DashboardBoardRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/products': typeof DashboardProductsRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/dashboard/board': typeof DashboardBoardRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/products': typeof DashboardProductsRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/board': typeof DashboardBoardRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/products': typeof DashboardProductsRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/dashboard/board'
     | '/dashboard/customers'
     | '/dashboard/notifications'
     | '/dashboard/products'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/dashboard/board'
     | '/dashboard/customers'
     | '/dashboard/notifications'
     | '/dashboard/products'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/dashboard/board'
     | '/dashboard/customers'
     | '/dashboard/notifications'
     | '/dashboard/products'
@@ -331,6 +343,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/board': {
+      id: '/dashboard/board'
+      path: '/board'
+      fullPath: '/dashboard/board'
+      preLoaderRoute: typeof DashboardBoardRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/customers': {
@@ -463,6 +482,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardBoardRoute: typeof DashboardBoardRoute
   DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
@@ -485,6 +505,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardBoardRoute: DashboardBoardRoute,
   DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardProductsRoute: DashboardProductsRoute,
