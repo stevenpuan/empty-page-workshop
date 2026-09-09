@@ -201,3 +201,29 @@ function StatCard({
     </Link>
   );
 }
+
+function BoardCard({
+  label,
+  value,
+  tone,
+  alert,
+}: {
+  label: string;
+  value: number;
+  tone: string;
+  alert?: boolean;
+}) {
+  return (
+    <Link
+      to="/dashboard/board"
+      className="block transition-transform hover:-translate-y-0.5"
+    >
+      <Card className={alert ? "border-2 border-current/40" : ""}>
+        <CardContent className="p-4">
+          <div className={`text-2xl font-bold tracking-tight ${tone}`}>{value ?? 0}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
