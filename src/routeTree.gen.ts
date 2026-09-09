@@ -17,6 +17,7 @@ import { Route as DashboardBoardRouteImport } from './routes/dashboard/board'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard/customers'
 import { Route as DashboardMyWorkRouteImport } from './routes/dashboard/my-work'
 import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
+import { Route as DashboardOutsourceRouteImport } from './routes/dashboard/outsource'
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
@@ -75,6 +76,11 @@ const DashboardMyWorkRoute = DashboardMyWorkRouteImport.update({
 const DashboardNotificationsRoute = DashboardNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardOutsourceRoute = DashboardOutsourceRouteImport.update({
+  id: '/outsource',
+  path: '/outsource',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardProductsRoute = DashboardProductsRouteImport.update({
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
     | '/dashboard/customers'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
+    | '/dashboard/outsource'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/dashboard/customers'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
+    | '/dashboard/outsource'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/dashboard/customers'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
+    | '/dashboard/outsource'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
@@ -417,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/dashboard/notifications'
       preLoaderRoute: typeof DashboardNotificationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/outsource': {
+      id: '/dashboard/outsource'
+      path: '/outsource'
+      fullPath: '/dashboard/outsource'
+      preLoaderRoute: typeof DashboardOutsourceRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/products': {
@@ -574,6 +593,7 @@ interface DashboardRouteChildren {
   DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardMyWorkRoute: typeof DashboardMyWorkRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
+  DashboardOutsourceRoute: typeof DashboardOutsourceRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardVendorsRoute: typeof DashboardVendorsRoute
@@ -599,6 +619,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardMyWorkRoute: DashboardMyWorkRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
+  DashboardOutsourceRoute: DashboardOutsourceRoute,
   DashboardProductsRoute: DashboardProductsRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardVendorsRoute: DashboardVendorsRoute,
