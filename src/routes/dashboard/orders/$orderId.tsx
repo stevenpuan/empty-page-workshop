@@ -370,6 +370,7 @@ function Page() {
                         {t.outsource_due_at ? `（${fmtDate(t.outsource_due_at)}到期）` : ""}
                       </span>
                     )}
+                    <OutsourceInfo link={linkByTask.get(t.id)} />
                   </TableCell>
                   {isManager && (
                     <TableCell className="text-right whitespace-nowrap">
@@ -386,6 +387,17 @@ function Page() {
                       <Button size="sm" variant="ghost" onClick={() => void skip(t)}>
                         跳過
                       </Button>
+                      {["pending", "assigned", "in_progress"].includes(t.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDispatchTarget(t)}
+                          className="text-purple-600 dark:text-purple-400"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                          派外包
+                        </Button>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>
