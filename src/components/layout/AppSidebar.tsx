@@ -209,7 +209,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-[12px] text-muted-foreground">營運系統</p>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        {groups.map((g) => {
+        {groupsBefore.map((g) => {
           if (g.route) {
             if (!visible(g)) return null;
             return (
