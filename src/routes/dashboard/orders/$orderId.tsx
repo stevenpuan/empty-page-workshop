@@ -80,6 +80,7 @@ interface TaskRow {
   blocked_reason: string | null;
   is_outsource: boolean;
   outsource_due_at: string | null;
+  due_at: string | null;
   work_stations: { name: string; color: string | null } | null;
   employees: { name: string } | null;
   vendors: { name: string } | null;
