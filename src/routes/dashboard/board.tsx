@@ -18,6 +18,7 @@ import { ChevronDown, ChevronRight, Monitor, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
+import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { RequirePerm } from "@/components/RequirePerm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { JobCard, type BoardTask } from "@/components/JobCard";
@@ -99,6 +100,7 @@ function Page() {
   const { company, isManager } = useAuth();
   const qc = useQueryClient();
   const canDrag = isManager;
+  useBoardRealtime();
 
   const [collapsed, setCollapsed] = useState<string[]>(COLLAPSED_BY_DEFAULT);
   const [stationFilter, setStationFilter] = useState<string[]>(EMPTY_STATIONS);
