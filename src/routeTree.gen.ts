@@ -10,33 +10,236 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
+import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
+import { Route as DashboardSettingsCompanyRouteImport } from './routes/dashboard/settings/company'
+import { Route as DashboardSettingsEmployeesRouteImport } from './routes/dashboard/settings/employees'
+import { Route as DashboardSettingsLookupsRouteImport } from './routes/dashboard/settings/lookups'
+import { Route as DashboardSettingsRolesRouteImport } from './routes/dashboard/settings/roles'
+import { Route as DashboardSettingsRulesRouteImport } from './routes/dashboard/settings/rules'
+import { Route as DashboardSystemActivityLogsRouteImport } from './routes/dashboard/system/activity-logs'
+import { Route as DashboardSystemAuditLogsRouteImport } from './routes/dashboard/system/audit-logs'
+import { Route as DashboardSystemChangelogRouteImport } from './routes/dashboard/system/changelog'
+import { Route as DashboardSystemConfigsRouteImport } from './routes/dashboard/system/configs'
+import { Route as DashboardSystemErrorLogsRouteImport } from './routes/dashboard/system/error-logs'
+import { Route as DashboardSystemMenusRouteImport } from './routes/dashboard/system/menus'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardNotificationsRoute = DashboardNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardProfileRoute = DashboardProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSettingsCompanyRoute =
+  DashboardSettingsCompanyRouteImport.update({
+    id: '/settings/company',
+    path: '/settings/company',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSettingsEmployeesRoute =
+  DashboardSettingsEmployeesRouteImport.update({
+    id: '/settings/employees',
+    path: '/settings/employees',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSettingsLookupsRoute =
+  DashboardSettingsLookupsRouteImport.update({
+    id: '/settings/lookups',
+    path: '/settings/lookups',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSettingsRolesRoute = DashboardSettingsRolesRouteImport.update({
+  id: '/settings/roles',
+  path: '/settings/roles',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSettingsRulesRoute = DashboardSettingsRulesRouteImport.update({
+  id: '/settings/rules',
+  path: '/settings/rules',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSystemActivityLogsRoute =
+  DashboardSystemActivityLogsRouteImport.update({
+    id: '/system/activity-logs',
+    path: '/system/activity-logs',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSystemAuditLogsRoute =
+  DashboardSystemAuditLogsRouteImport.update({
+    id: '/system/audit-logs',
+    path: '/system/audit-logs',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSystemChangelogRoute =
+  DashboardSystemChangelogRouteImport.update({
+    id: '/system/changelog',
+    path: '/system/changelog',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSystemConfigsRoute = DashboardSystemConfigsRouteImport.update({
+  id: '/system/configs',
+  path: '/system/configs',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSystemErrorLogsRoute =
+  DashboardSystemErrorLogsRouteImport.update({
+    id: '/system/error-logs',
+    path: '/system/error-logs',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSystemMenusRoute = DashboardSystemMenusRouteImport.update({
+  id: '/system/menus',
+  path: '/system/menus',
+  getParentRoute: () => DashboardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/login': typeof LoginRoute
+  '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
+  '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
+  '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
+  '/dashboard/settings/roles': typeof DashboardSettingsRolesRoute
+  '/dashboard/settings/rules': typeof DashboardSettingsRulesRoute
+  '/dashboard/system/activity-logs': typeof DashboardSystemActivityLogsRoute
+  '/dashboard/system/audit-logs': typeof DashboardSystemAuditLogsRoute
+  '/dashboard/system/changelog': typeof DashboardSystemChangelogRoute
+  '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
+  '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
+  '/dashboard/system/menus': typeof DashboardSystemMenusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard': typeof DashboardIndexRoute
+  '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
+  '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
+  '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
+  '/dashboard/settings/roles': typeof DashboardSettingsRolesRoute
+  '/dashboard/settings/rules': typeof DashboardSettingsRulesRoute
+  '/dashboard/system/activity-logs': typeof DashboardSystemActivityLogsRoute
+  '/dashboard/system/audit-logs': typeof DashboardSystemAuditLogsRoute
+  '/dashboard/system/changelog': typeof DashboardSystemChangelogRoute
+  '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
+  '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
+  '/dashboard/system/menus': typeof DashboardSystemMenusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/login': typeof LoginRoute
+  '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
+  '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
+  '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
+  '/dashboard/settings/roles': typeof DashboardSettingsRolesRoute
+  '/dashboard/settings/rules': typeof DashboardSettingsRulesRoute
+  '/dashboard/system/activity-logs': typeof DashboardSystemActivityLogsRoute
+  '/dashboard/system/audit-logs': typeof DashboardSystemAuditLogsRoute
+  '/dashboard/system/changelog': typeof DashboardSystemChangelogRoute
+  '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
+  '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
+  '/dashboard/system/menus': typeof DashboardSystemMenusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/dashboard/notifications'
+    | '/dashboard/profile'
+    | '/dashboard/'
+    | '/dashboard/settings/company'
+    | '/dashboard/settings/employees'
+    | '/dashboard/settings/lookups'
+    | '/dashboard/settings/roles'
+    | '/dashboard/settings/rules'
+    | '/dashboard/system/activity-logs'
+    | '/dashboard/system/audit-logs'
+    | '/dashboard/system/changelog'
+    | '/dashboard/system/configs'
+    | '/dashboard/system/error-logs'
+    | '/dashboard/system/menus'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard/notifications'
+    | '/dashboard/profile'
+    | '/dashboard'
+    | '/dashboard/settings/company'
+    | '/dashboard/settings/employees'
+    | '/dashboard/settings/lookups'
+    | '/dashboard/settings/roles'
+    | '/dashboard/settings/rules'
+    | '/dashboard/system/activity-logs'
+    | '/dashboard/system/audit-logs'
+    | '/dashboard/system/changelog'
+    | '/dashboard/system/configs'
+    | '/dashboard/system/error-logs'
+    | '/dashboard/system/menus'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/dashboard/notifications'
+    | '/dashboard/profile'
+    | '/dashboard/'
+    | '/dashboard/settings/company'
+    | '/dashboard/settings/employees'
+    | '/dashboard/settings/lookups'
+    | '/dashboard/settings/roles'
+    | '/dashboard/settings/rules'
+    | '/dashboard/system/activity-logs'
+    | '/dashboard/system/audit-logs'
+    | '/dashboard/system/changelog'
+    | '/dashboard/system/configs'
+    | '/dashboard/system/error-logs'
+    | '/dashboard/system/menus'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +251,163 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/notifications': {
+      id: '/dashboard/notifications'
+      path: '/notifications'
+      fullPath: '/dashboard/notifications'
+      preLoaderRoute: typeof DashboardNotificationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/profile': {
+      id: '/dashboard/profile'
+      path: '/profile'
+      fullPath: '/dashboard/profile'
+      preLoaderRoute: typeof DashboardProfileRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/company': {
+      id: '/dashboard/settings/company'
+      path: '/settings/company'
+      fullPath: '/dashboard/settings/company'
+      preLoaderRoute: typeof DashboardSettingsCompanyRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/employees': {
+      id: '/dashboard/settings/employees'
+      path: '/settings/employees'
+      fullPath: '/dashboard/settings/employees'
+      preLoaderRoute: typeof DashboardSettingsEmployeesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/lookups': {
+      id: '/dashboard/settings/lookups'
+      path: '/settings/lookups'
+      fullPath: '/dashboard/settings/lookups'
+      preLoaderRoute: typeof DashboardSettingsLookupsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/roles': {
+      id: '/dashboard/settings/roles'
+      path: '/settings/roles'
+      fullPath: '/dashboard/settings/roles'
+      preLoaderRoute: typeof DashboardSettingsRolesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/rules': {
+      id: '/dashboard/settings/rules'
+      path: '/settings/rules'
+      fullPath: '/dashboard/settings/rules'
+      preLoaderRoute: typeof DashboardSettingsRulesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/system/activity-logs': {
+      id: '/dashboard/system/activity-logs'
+      path: '/system/activity-logs'
+      fullPath: '/dashboard/system/activity-logs'
+      preLoaderRoute: typeof DashboardSystemActivityLogsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/system/audit-logs': {
+      id: '/dashboard/system/audit-logs'
+      path: '/system/audit-logs'
+      fullPath: '/dashboard/system/audit-logs'
+      preLoaderRoute: typeof DashboardSystemAuditLogsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/system/changelog': {
+      id: '/dashboard/system/changelog'
+      path: '/system/changelog'
+      fullPath: '/dashboard/system/changelog'
+      preLoaderRoute: typeof DashboardSystemChangelogRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/system/configs': {
+      id: '/dashboard/system/configs'
+      path: '/system/configs'
+      fullPath: '/dashboard/system/configs'
+      preLoaderRoute: typeof DashboardSystemConfigsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/system/error-logs': {
+      id: '/dashboard/system/error-logs'
+      path: '/system/error-logs'
+      fullPath: '/dashboard/system/error-logs'
+      preLoaderRoute: typeof DashboardSystemErrorLogsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/system/menus': {
+      id: '/dashboard/system/menus'
+      path: '/system/menus'
+      fullPath: '/dashboard/system/menus'
+      preLoaderRoute: typeof DashboardSystemMenusRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardNotificationsRoute: typeof DashboardNotificationsRoute
+  DashboardProfileRoute: typeof DashboardProfileRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardSettingsCompanyRoute: typeof DashboardSettingsCompanyRoute
+  DashboardSettingsEmployeesRoute: typeof DashboardSettingsEmployeesRoute
+  DashboardSettingsLookupsRoute: typeof DashboardSettingsLookupsRoute
+  DashboardSettingsRolesRoute: typeof DashboardSettingsRolesRoute
+  DashboardSettingsRulesRoute: typeof DashboardSettingsRulesRoute
+  DashboardSystemActivityLogsRoute: typeof DashboardSystemActivityLogsRoute
+  DashboardSystemAuditLogsRoute: typeof DashboardSystemAuditLogsRoute
+  DashboardSystemChangelogRoute: typeof DashboardSystemChangelogRoute
+  DashboardSystemConfigsRoute: typeof DashboardSystemConfigsRoute
+  DashboardSystemErrorLogsRoute: typeof DashboardSystemErrorLogsRoute
+  DashboardSystemMenusRoute: typeof DashboardSystemMenusRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardNotificationsRoute: DashboardNotificationsRoute,
+  DashboardProfileRoute: DashboardProfileRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+  DashboardSettingsCompanyRoute: DashboardSettingsCompanyRoute,
+  DashboardSettingsEmployeesRoute: DashboardSettingsEmployeesRoute,
+  DashboardSettingsLookupsRoute: DashboardSettingsLookupsRoute,
+  DashboardSettingsRolesRoute: DashboardSettingsRolesRoute,
+  DashboardSettingsRulesRoute: DashboardSettingsRulesRoute,
+  DashboardSystemActivityLogsRoute: DashboardSystemActivityLogsRoute,
+  DashboardSystemAuditLogsRoute: DashboardSystemAuditLogsRoute,
+  DashboardSystemChangelogRoute: DashboardSystemChangelogRoute,
+  DashboardSystemConfigsRoute: DashboardSystemConfigsRoute,
+  DashboardSystemErrorLogsRoute: DashboardSystemErrorLogsRoute,
+  DashboardSystemMenusRoute: DashboardSystemMenusRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
