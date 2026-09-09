@@ -159,6 +159,41 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
     return true;
   };
 
+  // 補充選單（menus 表尚未收錄的新頁面）：外包追蹤、集團總覽
+  const canOutsource = moduleEnabled("outsource") && can("outsource", "view");
+  const canGroup = moduleEnabled("group_overview") && can("group_overview", "view");
+  const knownRoutes = new Set(menus.map((m) => m.route));
+
+  const { data: mismatchCount = 0 } = useQuery({
+    queryKey: ["group_mismatch_count"],
+    enabled: canGroup,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("group_reconciliation")
+        .select("*", { count: "exact", head: true })
+        .eq("amount_mismatch", true);
+      if (error) return 0; // view 尚未建立或權限不足時靜默
+      return count ?? 0;
+    },
+  });
+
+  const extraItems = [
+    canOutsource && !knownRoutes.has("/dashboard/outsource")
+      ? { title: "外包追蹤", route: "/dashboard/outsource", icon: "ExternalLink", badge: 0 }
+      : null,
+    canGroup && !knownRoutes.has("/dashboard/group")
+      ? { title: "集團總覽", route: "/dashboard/group", icon: "Building2", badge: mismatchCount }
+      : null,
+  ].filter((x): x is { title: string; route: string; icon: string; badge: number } => !!x);
+
+  // 插入位置：「設定」群組之前；找不到則附加在最後
+  const settingsIdx = groups.findIndex(
+    (g) => g.menu_key.includes("setting") || g.title === "設定",
+  );
+  const groupsBefore = settingsIdx >= 0 ? groups.slice(0, settingsIdx) : groups;
+  const groupsAfter = settingsIdx >= 0 ? groups.slice(settingsIdx) : [];
+
   const isOpen = (key: string, kids: MenuRow[]) =>
     key in openMap ? openMap[key] : kids.some((k) => k.route === pathname);
   const toggle = (key: string, kids: MenuRow[]) =>
@@ -174,7 +209,70 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-[12px] text-muted-foreground">營運系統</p>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        {groups.map((g) => {
+        {groupsBefore.map((g) => {
+          if (g.route) {
+            if (!visible(g)) return null;
+            return (
+              <SideLink
+                key={g.id}
+                to={g.route}
+                icon={g.icon}
+                title={g.title}
+                active={pathname === g.route}
+                onNavigate={onNavigate}
+              />
+            );
+          }
+          const kids = childrenOf(g.id).filter(visible);
+          if (!kids.length) return null;
+          const open = isOpen(g.menu_key, kids);
+          return (
+            <div key={g.id} className="pt-1">
+              <button
+                type="button"
+                onClick={() => toggle(g.menu_key, kids)}
+                aria-expanded={open}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-base font-semibold text-foreground/80 hover:bg-accent/50 transition-colors"
+              >
+                <Icon name={g.icon} className="w-5 h-5 shrink-0" />
+                <span className="flex-1 text-left truncate">{g.title}</span>
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 shrink-0 transition-transform",
+                    open ? "rotate-0" : "-rotate-90",
+                  )}
+                />
+              </button>
+              {open && (
+                <div className="mt-0.5 space-y-0.5">
+                  {kids.map((k) => (
+                    <SideLink
+                      key={k.id}
+                      to={k.route!}
+                      icon={k.icon}
+                      title={k.title}
+                      active={pathname === k.route}
+                      onNavigate={onNavigate}
+                      indent
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {extraItems.map((item) => (
+          <SideLink
+            key={item.route}
+            to={item.route}
+            icon={item.icon}
+            title={item.title}
+            active={pathname === item.route}
+            onNavigate={onNavigate}
+            badge={item.badge}
+          />
+        ))}
+        {groupsAfter.map((g) => {
           if (g.route) {
             if (!visible(g)) return null;
             return (
@@ -296,6 +394,7 @@ function SideLink({
   active,
   onNavigate,
   indent,
+  badge,
 }: {
   to: string;
   icon: string | null;
@@ -303,6 +402,7 @@ function SideLink({
   active: boolean;
   onNavigate?: (() => void) | undefined;
   indent?: boolean | undefined;
+  badge?: number | undefined;
 }) {
   return (
     <Link
@@ -319,6 +419,9 @@ function SideLink({
     >
       <Icon name={icon} className="w-5 h-5 shrink-0" />
       <span className="truncate">{title}</span>
+      {badge != null && badge > 0 && (
+        <span className="ml-auto w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" title="有金額不一致的往來紀錄" />
+      )}
     </Link>
   );
 }
