@@ -18,9 +18,10 @@ export const Route = createFileRoute("/dashboard/board/tv")({
       { property: "og:description", content: "全螢幕深色派工看板，即時顯示進行中的工序。" },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { company?: string } => ({
-    company: typeof search.company === "string" && search.company ? search.company : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { company?: string } => {
+    const c = search["company"];
+    return typeof c === "string" && c ? { company: c } : {};
+  },
   component: TvPage,
 });
 
