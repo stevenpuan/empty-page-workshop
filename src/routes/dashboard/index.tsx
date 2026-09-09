@@ -72,6 +72,23 @@ function Home() {
     },
   });
 
+  useBoardRealtime();
+  // board_stats view：還沒有訂單（或 view 尚未建立）時顯示全零，不擋畫面
+  const { data: board = ZERO_STATS } = useQuery({
+    queryKey: ["board_stats", company?.id],
+    enabled: !!company?.id,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("board_stats")
+        .select("*")
+        .eq("company_id", company!.id)
+        .maybeSingle();
+      if (error) return ZERO_STATS;
+      return { ...ZERO_STATS, ...(data ?? {}) } as BoardStats;
+    },
+  });
+
   const name = employee?.name ?? profile?.display_name ?? "";
   return (
     <div className="space-y-6">
@@ -79,7 +96,39 @@ function Home() {
         title={`歡迎回來，${name}`}
         description={`${company?.name ?? ""} · 角色：${isPlatformAdmin && !employee ? "系統維護" : (employee?.role?.name ?? "—")}`}
       />
+
+      {can("board", "view") && (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <BoardCard label="進行中" value={board.in_progress_count} tone="text-blue-600 dark:text-blue-400" />
+            <BoardCard
+              label="待排工"
+              value={(board.pending_count ?? 0) + (board.assigned_count ?? 0)}
+              tone="text-muted-foreground"
+            />
+            <BoardCard
+              label="卡關"
+              value={board.blocked_count}
+              tone="text-orange-600 dark:text-orange-400"
+              alert={board.blocked_count > 0}
+            />
+            <BoardCard label="等客戶" value={board.waiting_customer_count} tone="text-yellow-600 dark:text-yellow-400" />
+            <BoardCard
+              label="逾期"
+              value={board.overdue_count}
+              tone="text-destructive"
+              alert={board.overdue_count > 0}
+            />
+            <BoardCard label="今日到期" value={board.due_today_count} tone="text-purple-600 dark:text-purple-400" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            活躍訂單 {board.active_order_count ?? 0} 張 / 已完成工序 {board.done_task_count ?? 0} 道
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
         {can("employees", "view") && (
           <StatCard
             icon={<Users className="w-5 h-5" />}
