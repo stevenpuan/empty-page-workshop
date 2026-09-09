@@ -3,10 +3,36 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, Bell, KeyRound, Building2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/dashboard/")({ component: Home });
+
+interface BoardStats {
+  in_progress_count: number;
+  pending_count: number;
+  assigned_count: number;
+  blocked_count: number;
+  waiting_customer_count: number;
+  overdue_count: number;
+  due_today_count: number;
+  active_order_count: number | null;
+  done_task_count: number | null;
+}
+
+const ZERO_STATS: BoardStats = {
+  in_progress_count: 0,
+  pending_count: 0,
+  assigned_count: 0,
+  blocked_count: 0,
+  waiting_customer_count: 0,
+  overdue_count: 0,
+  due_today_count: 0,
+  active_order_count: 0,
+  done_task_count: 0,
+};
+
 
 /**
  * S1 版首頁：只放底座相關的狀態卡。S3 會換成營運總覽（逾期數、等校稿數、今日出貨）。

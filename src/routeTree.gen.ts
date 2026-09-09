@@ -23,6 +23,7 @@ import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors
 import { Route as DashboardBoardIndexRouteImport } from './routes/dashboard/board/index'
 import { Route as DashboardBoardTvRouteImport } from './routes/dashboard/board/tv'
 import { Route as DashboardOrdersIndexRouteImport } from './routes/dashboard/orders/index'
+import { Route as DashboardOrdersOrderIdRouteImport } from './routes/dashboard/orders/$orderId'
 import { Route as DashboardSettingsCompanyRouteImport } from './routes/dashboard/settings/company'
 import { Route as DashboardSettingsEmployeesRouteImport } from './routes/dashboard/settings/employees'
 import { Route as DashboardSettingsLookupsRouteImport } from './routes/dashboard/settings/lookups'
@@ -104,6 +105,11 @@ const DashboardBoardTvRoute = DashboardBoardTvRouteImport.update({
 const DashboardOrdersIndexRoute = DashboardOrdersIndexRouteImport.update({
   id: '/orders/',
   path: '/orders/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardOrdersOrderIdRoute = DashboardOrdersOrderIdRouteImport.update({
+  id: '/orders/$orderId',
+  path: '/orders/$orderId',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsCompanyRoute =
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
+  '/dashboard/orders/$orderId': typeof DashboardOrdersOrderIdRoute
   '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
   '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
+  '/dashboard/orders/$orderId': typeof DashboardOrdersOrderIdRoute
   '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
   '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
@@ -243,6 +251,7 @@ export interface FileRoutesById {
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
+  '/dashboard/orders/$orderId': typeof DashboardOrdersOrderIdRoute
   '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
   '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
@@ -273,6 +282,7 @@ export interface FileRouteTypes {
     | '/dashboard/vendors'
     | '/dashboard/'
     | '/dashboard/board/tv'
+    | '/dashboard/orders/$orderId'
     | '/dashboard/settings/company'
     | '/dashboard/settings/employees'
     | '/dashboard/settings/lookups'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/dashboard/vendors'
     | '/dashboard'
     | '/dashboard/board/tv'
+    | '/dashboard/orders/$orderId'
     | '/dashboard/settings/company'
     | '/dashboard/settings/employees'
     | '/dashboard/settings/lookups'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/dashboard/vendors'
     | '/dashboard/'
     | '/dashboard/board/tv'
+    | '/dashboard/orders/$orderId'
     | '/dashboard/settings/company'
     | '/dashboard/settings/employees'
     | '/dashboard/settings/lookups'
@@ -449,6 +461,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardOrdersIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/orders/$orderId': {
+      id: '/dashboard/orders/$orderId'
+      path: '/orders/$orderId'
+      fullPath: '/dashboard/orders/$orderId'
+      preLoaderRoute: typeof DashboardOrdersOrderIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/settings/company': {
       id: '/dashboard/settings/company'
       path: '/settings/company'
@@ -559,6 +578,7 @@ interface DashboardRouteChildren {
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardVendorsRoute: typeof DashboardVendorsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardOrdersOrderIdRoute: typeof DashboardOrdersOrderIdRoute
   DashboardSettingsCompanyRoute: typeof DashboardSettingsCompanyRoute
   DashboardSettingsEmployeesRoute: typeof DashboardSettingsEmployeesRoute
   DashboardSettingsLookupsRoute: typeof DashboardSettingsLookupsRoute
@@ -583,6 +603,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardVendorsRoute: DashboardVendorsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardOrdersOrderIdRoute: DashboardOrdersOrderIdRoute,
   DashboardSettingsCompanyRoute: DashboardSettingsCompanyRoute,
   DashboardSettingsEmployeesRoute: DashboardSettingsEmployeesRoute,
   DashboardSettingsLookupsRoute: DashboardSettingsLookupsRoute,
