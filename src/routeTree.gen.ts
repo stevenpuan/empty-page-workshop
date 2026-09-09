@@ -18,6 +18,7 @@ import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/n
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
+import { Route as DashboardOrdersIndexRouteImport } from './routes/dashboard/orders/index'
 import { Route as DashboardSettingsCompanyRouteImport } from './routes/dashboard/settings/company'
 import { Route as DashboardSettingsEmployeesRouteImport } from './routes/dashboard/settings/employees'
 import { Route as DashboardSettingsLookupsRouteImport } from './routes/dashboard/settings/lookups'
@@ -74,6 +75,11 @@ const DashboardProfileRoute = DashboardProfileRouteImport.update({
 const DashboardVendorsRoute = DashboardVendorsRouteImport.update({
   id: '/vendors',
   path: '/vendors',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardOrdersIndexRoute = DashboardOrdersIndexRouteImport.update({
+  id: '/orders/',
+  path: '/orders/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsCompanyRoute =
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
   '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
   '/dashboard/system/menus': typeof DashboardSystemMenusRoute
+  '/dashboard/orders/': typeof DashboardOrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
   '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
   '/dashboard/system/menus': typeof DashboardSystemMenusRoute
+  '/dashboard/orders': typeof DashboardOrdersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
   '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
   '/dashboard/system/menus': typeof DashboardSystemMenusRoute
+  '/dashboard/orders/': typeof DashboardOrdersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/dashboard/system/configs'
     | '/dashboard/system/error-logs'
     | '/dashboard/system/menus'
+    | '/dashboard/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/dashboard/system/configs'
     | '/dashboard/system/error-logs'
     | '/dashboard/system/menus'
+    | '/dashboard/orders'
   id:
     | '__root__'
     | '/'
@@ -283,6 +294,7 @@ export interface FileRouteTypes {
     | '/dashboard/system/configs'
     | '/dashboard/system/error-logs'
     | '/dashboard/system/menus'
+    | '/dashboard/orders/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -354,6 +366,13 @@ declare module '@tanstack/react-router' {
       path: '/vendors'
       fullPath: '/dashboard/vendors'
       preLoaderRoute: typeof DashboardVendorsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/orders/': {
+      id: '/dashboard/orders/'
+      path: '/orders'
+      fullPath: '/dashboard/orders/'
+      preLoaderRoute: typeof DashboardOrdersIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/settings/company': {
@@ -462,6 +481,7 @@ interface DashboardRouteChildren {
   DashboardSystemConfigsRoute: typeof DashboardSystemConfigsRoute
   DashboardSystemErrorLogsRoute: typeof DashboardSystemErrorLogsRoute
   DashboardSystemMenusRoute: typeof DashboardSystemMenusRoute
+  DashboardOrdersIndexRoute: typeof DashboardOrdersIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -483,6 +503,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSystemConfigsRoute: DashboardSystemConfigsRoute,
   DashboardSystemErrorLogsRoute: DashboardSystemErrorLogsRoute,
   DashboardSystemMenusRoute: DashboardSystemMenusRoute,
+  DashboardOrdersIndexRoute: DashboardOrdersIndexRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
