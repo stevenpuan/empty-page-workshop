@@ -139,6 +139,7 @@ function Page() {
   const [assignTarget, setAssignTarget] = useState<TaskRow | null>(null);
   const [assignee, setAssignee] = useState("");
   const [showLogs, setShowLogs] = useState(false);
+  const [dispatchTarget, setDispatchTarget] = useState<TaskRow | null>(null);
 
   const tasksKey = ["order_detail_tasks", orderId];
 
@@ -163,7 +164,7 @@ function Page() {
       const { data, error } = await supabase
         .from("order_tasks")
         .select(
-          "id, step_no, status, started_at, done_at, blocked_reason, is_outsource, outsource_due_at, work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
+          "id, step_no, status, started_at, done_at, blocked_reason, is_outsource, outsource_due_at, due_at, work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
         )
         .eq("order_id", orderId)
         .order("step_no");
