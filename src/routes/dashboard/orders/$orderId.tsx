@@ -491,7 +491,203 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DispatchOutsourceDialog
+        task={dispatchTarget}
+        orderNo={order?.order_no ?? ""}
+        itemName={order?.item_name ?? ""}
+        companyId={company?.id ?? null}
+        onClose={() => setDispatchTarget(null)}
+        onDone={() => {
+          void qc.invalidateQueries({ queryKey: tasksKey });
+          void qc.invalidateQueries({ queryKey: ["order_outsource_links", orderId] });
+        }}
+      />
     </div>
+  );
+}
+
+const LINK_STATUS_LABEL: Record<string, string> = {
+  pending: "待對方接單",
+  accepted: "對方已接單",
+  in_progress: "對方生產中",
+  completed: "已完成",
+  shipped: "已出貨",
+};
+
+function OutsourceInfo({ link }: { link: LinkRow | undefined }) {
+  if (!link) return null;
+  const done = link.status === "completed";
+  const late =
+    !done && !!link.agreed_due_date && link.agreed_due_date < taipeiToday();
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <span>已派 → {link.vendors?.name ?? "外包夥伴"}</span>
+      {link.agreed_amount != null && (
+        <span>｜金額 {new Intl.NumberFormat("zh-TW").format(Number(link.agreed_amount))}</span>
+      )}
+      <Badge
+        variant="outline"
+        className={
+          done
+            ? "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/40"
+            : "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/40"
+        }
+      >
+        {LINK_STATUS_LABEL[link.status] ?? link.status}
+      </Badge>
+      {late && (
+        <span className="text-destructive font-medium">
+          已逾期（{fmtDate(link.agreed_due_date)}）
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DispatchOutsourceDialog({
+  task,
+  orderNo,
+  itemName,
+  companyId,
+  onClose,
+  onDone,
+}: {
+  task: TaskRow | null;
+  orderNo: string;
+  itemName: string;
+  companyId: string | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [vendorId, setVendorId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (task) {
+      setVendorId("");
+      setAmount("");
+      setDueDate(task.due_at ?? "");
+      setNote("");
+    }
+  }, [task]);
+
+  const { data: vendors = [], error: vendorErr } = useQuery({
+    queryKey: ["outsource_vendors", companyId],
+    enabled: !!companyId && !!task,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("id, name")
+        .eq("company_id", companyId)
+        .eq("is_outsource", true)
+        .eq("auto_dispatch", true)
+        .not("linked_company_id", "is", null)
+        .order("name");
+      if (error) throw error;
+      return data as { id: string; name: string }[];
+    },
+  });
+
+  const submit = async () => {
+    if (!task) return;
+    if (!vendorId) {
+      toast.error("請選擇外包廠商");
+      return;
+    }
+    const amt = Number(amount);
+    if (!amount || !Number.isFinite(amt) || amt <= 0) {
+      toast.error("請填寫正確的外包金額");
+      return;
+    }
+    setSaving(true);
+    const { data, error } = await supabase.rpc("dispatch_outsource", {
+      p_task_id: task.id,
+      p_vendor_id: vendorId,
+      p_amount: amt,
+      p_due_date: dueDate || null,
+      p_note: note.trim() || null,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(humanizeError(error, "外包發派"));
+      return;
+    }
+    const toOrderNo =
+      (data as { to_order_no?: string } | null)?.to_order_no ??
+      (Array.isArray(data) ? (data[0] as { to_order_no?: string } | undefined)?.to_order_no : undefined) ??
+      "";
+    toast.success(`外包發派成功！對方已自動建立工單 ${toOrderNo}`);
+    onDone();
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>派外包</DialogTitle>
+          <DialogDescription>
+            {orderNo}｜{itemName}｜步驟 {task?.step_no}　{task?.work_stations?.name ?? ""}（
+            {TASK_STATUS_LABEL[task?.status ?? ""] ?? task?.status}）
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>外包廠商 *</Label>
+            <Select value={vendorId} onValueChange={setVendorId}>
+              <SelectTrigger>
+                <SelectValue placeholder="請選擇" />
+              </SelectTrigger>
+              <SelectContent>
+                {vendors.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {vendorErr && (
+              <p className="text-xs text-destructive">{humanizeError(vendorErr, "載入廠商")}</p>
+            )}
+            {!vendorErr && vendors.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                目前沒有已綁定夥伴公司且開啟自動派工的外包廠商。
+              </p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label>外包金額 *</Label>
+            <Input
+              type="number"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>約定交期</Label>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>備註</Label>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={() => void submit()} disabled={saving}>
+            {saving ? "發派中…" : "確認發派"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
