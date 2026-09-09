@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardBoardRouteImport } from './routes/dashboard/board'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard/customers'
+import { Route as DashboardGroupRouteImport } from './routes/dashboard/group'
 import { Route as DashboardMyWorkRouteImport } from './routes/dashboard/my-work'
 import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
 import { Route as DashboardOutsourceRouteImport } from './routes/dashboard/outsource'
@@ -66,6 +67,11 @@ const DashboardBoardRoute = DashboardBoardRouteImport.update({
 const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardGroupRoute = DashboardGroupRouteImport.update({
+  id: '/group',
+  path: '/group',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardMyWorkRoute = DashboardMyWorkRouteImport.update({
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard/board': typeof DashboardBoardRouteWithChildren
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/group': typeof DashboardGroupRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/group': typeof DashboardGroupRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/dashboard/board': typeof DashboardBoardRouteWithChildren
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/group': typeof DashboardGroupRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard/board'
     | '/dashboard/customers'
+    | '/dashboard/group'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
     | '/dashboard/outsource'
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard/customers'
+    | '/dashboard/group'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
     | '/dashboard/outsource'
@@ -342,6 +353,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard/board'
     | '/dashboard/customers'
+    | '/dashboard/group'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
     | '/dashboard/outsource'
@@ -415,6 +427,13 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/dashboard/customers'
       preLoaderRoute: typeof DashboardCustomersRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/group': {
+      id: '/dashboard/group'
+      path: '/group'
+      fullPath: '/dashboard/group'
+      preLoaderRoute: typeof DashboardGroupRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/my-work': {
@@ -591,6 +610,7 @@ const DashboardBoardRouteWithChildren = DashboardBoardRoute._addFileChildren(
 interface DashboardRouteChildren {
   DashboardBoardRoute: typeof DashboardBoardRouteWithChildren
   DashboardCustomersRoute: typeof DashboardCustomersRoute
+  DashboardGroupRoute: typeof DashboardGroupRoute
   DashboardMyWorkRoute: typeof DashboardMyWorkRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardOutsourceRoute: typeof DashboardOutsourceRoute
@@ -617,6 +637,7 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBoardRoute: DashboardBoardRouteWithChildren,
   DashboardCustomersRoute: DashboardCustomersRoute,
+  DashboardGroupRoute: DashboardGroupRoute,
   DashboardMyWorkRoute: DashboardMyWorkRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardOutsourceRoute: DashboardOutsourceRoute,
