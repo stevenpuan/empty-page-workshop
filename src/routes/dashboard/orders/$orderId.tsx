@@ -202,6 +202,24 @@ function Page() {
     },
   });
 
+  // 跨公司外包單（S4 才會建表；查不到時靜默略過）
+  const { data: links = [] } = useQuery({
+    queryKey: ["order_outsource_links", orderId],
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cross_company_links")
+        .select(
+          "id, from_task_id, status, agreed_amount, agreed_due_date, to_order_no, vendors:vendor_id(name)",
+        )
+        .eq("from_order_id", orderId)
+        .not("status", "in", "(rejected,cancelled)");
+      if (error) throw error;
+      return data as unknown as LinkRow[];
+    },
+  });
+  const linkByTask = new Map(links.map((l) => [l.from_task_id, l]));
+
   const total = tasks.length;
   const doneCount = tasks.filter((t) => t.status === "done" || t.status === "skipped").length;
   const pct = total ? Math.round((doneCount / total) * 100) : 0;
