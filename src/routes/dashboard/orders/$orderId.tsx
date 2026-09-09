@@ -86,6 +86,16 @@ interface TaskRow {
   vendors: { name: string } | null;
 }
 
+interface LinkRow {
+  id: string;
+  from_task_id: string;
+  status: string;
+  agreed_amount: number | null;
+  agreed_due_date: string | null;
+  to_order_no: string | null;
+  vendors: { name: string } | null;
+}
+
 interface LogRow {
   id: string;
   created_at: string;
