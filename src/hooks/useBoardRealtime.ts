@@ -11,7 +11,7 @@ export function useBoardRealtime() {
         "postgres_changes",
         { event: "*", schema: "public", table: "order_tasks" },
         () => {
-          qc.invalidateQueries({ queryKey: ["board_tasks"] });
+          qc.invalidateQueries({ queryKey: ["order_tasks_board"] });
         },
       )
       .subscribe();
