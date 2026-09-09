@@ -419,6 +419,9 @@ function SideLink({
     >
       <Icon name={icon} className="w-5 h-5 shrink-0" />
       <span className="truncate">{title}</span>
+      {badge != null && badge > 0 && (
+        <span className="ml-auto w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" title="有金額不一致的往來紀錄" />
+      )}
     </Link>
   );
 }
