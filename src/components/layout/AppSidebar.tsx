@@ -159,6 +159,41 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
     return true;
   };
 
+  // 補充選單（menus 表尚未收錄的新頁面）：外包追蹤、集團總覽
+  const canOutsource = moduleEnabled("outsource") && can("outsource", "view");
+  const canGroup = moduleEnabled("group_overview") && can("group_overview", "view");
+  const knownRoutes = new Set(menus.map((m) => m.route));
+
+  const { data: mismatchCount = 0 } = useQuery({
+    queryKey: ["group_mismatch_count"],
+    enabled: canGroup,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("group_reconciliation")
+        .select("*", { count: "exact", head: true })
+        .eq("amount_mismatch", true);
+      if (error) return 0; // view 尚未建立或權限不足時靜默
+      return count ?? 0;
+    },
+  });
+
+  const extraItems = [
+    canOutsource && !knownRoutes.has("/dashboard/outsource")
+      ? { title: "外包追蹤", route: "/dashboard/outsource", icon: "ExternalLink", badge: 0 }
+      : null,
+    canGroup && !knownRoutes.has("/dashboard/group")
+      ? { title: "集團總覽", route: "/dashboard/group", icon: "Building2", badge: mismatchCount }
+      : null,
+  ].filter((x): x is { title: string; route: string; icon: string; badge: number } => !!x);
+
+  // 插入位置：「設定」群組之前；找不到則附加在最後
+  const settingsIdx = groups.findIndex(
+    (g) => g.menu_key.includes("setting") || g.title === "設定",
+  );
+  const groupsBefore = settingsIdx >= 0 ? groups.slice(0, settingsIdx) : groups;
+  const groupsAfter = settingsIdx >= 0 ? groups.slice(settingsIdx) : [];
+
   const isOpen = (key: string, kids: MenuRow[]) =>
     key in openMap ? openMap[key] : kids.some((k) => k.route === pathname);
   const toggle = (key: string, kids: MenuRow[]) =>
