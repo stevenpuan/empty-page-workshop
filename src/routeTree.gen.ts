@@ -19,6 +19,8 @@ import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/n
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
+import { Route as DashboardBoardIndexRouteImport } from './routes/dashboard/board/index'
+import { Route as DashboardBoardTvRouteImport } from './routes/dashboard/board/tv'
 import { Route as DashboardOrdersIndexRouteImport } from './routes/dashboard/orders/index'
 import { Route as DashboardSettingsCompanyRouteImport } from './routes/dashboard/settings/company'
 import { Route as DashboardSettingsEmployeesRouteImport } from './routes/dashboard/settings/employees'
@@ -82,6 +84,16 @@ const DashboardVendorsRoute = DashboardVendorsRouteImport.update({
   id: '/vendors',
   path: '/vendors',
   getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardBoardIndexRoute = DashboardBoardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardBoardRoute,
+} as any)
+const DashboardBoardTvRoute = DashboardBoardTvRouteImport.update({
+  id: '/tv',
+  path: '/tv',
+  getParentRoute: () => DashboardBoardRoute,
 } as any)
 const DashboardOrdersIndexRoute = DashboardOrdersIndexRouteImport.update({
   id: '/orders/',
@@ -161,13 +173,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
-  '/dashboard/board': typeof DashboardBoardRoute
+  '/dashboard/board': typeof DashboardBoardRouteWithChildren
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/board/tv': typeof DashboardBoardTvRoute
   '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
   '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
@@ -180,18 +193,19 @@ export interface FileRoutesByFullPath {
   '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
   '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
   '/dashboard/system/menus': typeof DashboardSystemMenusRoute
+  '/dashboard/board/': typeof DashboardBoardIndexRoute
   '/dashboard/orders/': typeof DashboardOrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/dashboard/board': typeof DashboardBoardRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/dashboard/board/tv': typeof DashboardBoardTvRoute
   '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
   '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
@@ -204,6 +218,7 @@ export interface FileRoutesByTo {
   '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
   '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
   '/dashboard/system/menus': typeof DashboardSystemMenusRoute
+  '/dashboard/board': typeof DashboardBoardIndexRoute
   '/dashboard/orders': typeof DashboardOrdersIndexRoute
 }
 export interface FileRoutesById {
@@ -211,13 +226,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
-  '/dashboard/board': typeof DashboardBoardRoute
+  '/dashboard/board': typeof DashboardBoardRouteWithChildren
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/board/tv': typeof DashboardBoardTvRoute
   '/dashboard/settings/company': typeof DashboardSettingsCompanyRoute
   '/dashboard/settings/employees': typeof DashboardSettingsEmployeesRoute
   '/dashboard/settings/lookups': typeof DashboardSettingsLookupsRoute
@@ -230,6 +246,7 @@ export interface FileRoutesById {
   '/dashboard/system/configs': typeof DashboardSystemConfigsRoute
   '/dashboard/system/error-logs': typeof DashboardSystemErrorLogsRoute
   '/dashboard/system/menus': typeof DashboardSystemMenusRoute
+  '/dashboard/board/': typeof DashboardBoardIndexRoute
   '/dashboard/orders/': typeof DashboardOrdersIndexRoute
 }
 export interface FileRouteTypes {
@@ -245,6 +262,7 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/vendors'
     | '/dashboard/'
+    | '/dashboard/board/tv'
     | '/dashboard/settings/company'
     | '/dashboard/settings/employees'
     | '/dashboard/settings/lookups'
@@ -257,18 +275,19 @@ export interface FileRouteTypes {
     | '/dashboard/system/configs'
     | '/dashboard/system/error-logs'
     | '/dashboard/system/menus'
+    | '/dashboard/board/'
     | '/dashboard/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/dashboard/board'
     | '/dashboard/customers'
     | '/dashboard/notifications'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
     | '/dashboard'
+    | '/dashboard/board/tv'
     | '/dashboard/settings/company'
     | '/dashboard/settings/employees'
     | '/dashboard/settings/lookups'
@@ -281,6 +300,7 @@ export interface FileRouteTypes {
     | '/dashboard/system/configs'
     | '/dashboard/system/error-logs'
     | '/dashboard/system/menus'
+    | '/dashboard/board'
     | '/dashboard/orders'
   id:
     | '__root__'
@@ -294,6 +314,7 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/vendors'
     | '/dashboard/'
+    | '/dashboard/board/tv'
     | '/dashboard/settings/company'
     | '/dashboard/settings/employees'
     | '/dashboard/settings/lookups'
@@ -306,6 +327,7 @@ export interface FileRouteTypes {
     | '/dashboard/system/configs'
     | '/dashboard/system/error-logs'
     | '/dashboard/system/menus'
+    | '/dashboard/board/'
     | '/dashboard/orders/'
   fileRoutesById: FileRoutesById
 }
@@ -386,6 +408,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/vendors'
       preLoaderRoute: typeof DashboardVendorsRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/board/': {
+      id: '/dashboard/board/'
+      path: '/'
+      fullPath: '/dashboard/board/'
+      preLoaderRoute: typeof DashboardBoardIndexRouteImport
+      parentRoute: typeof DashboardBoardRoute
+    }
+    '/dashboard/board/tv': {
+      id: '/dashboard/board/tv'
+      path: '/tv'
+      fullPath: '/dashboard/board/tv'
+      preLoaderRoute: typeof DashboardBoardTvRouteImport
+      parentRoute: typeof DashboardBoardRoute
     }
     '/dashboard/orders/': {
       id: '/dashboard/orders/'
@@ -481,8 +517,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DashboardBoardRouteChildren {
+  DashboardBoardTvRoute: typeof DashboardBoardTvRoute
+  DashboardBoardIndexRoute: typeof DashboardBoardIndexRoute
+}
+
+const DashboardBoardRouteChildren: DashboardBoardRouteChildren = {
+  DashboardBoardTvRoute: DashboardBoardTvRoute,
+  DashboardBoardIndexRoute: DashboardBoardIndexRoute,
+}
+
+const DashboardBoardRouteWithChildren = DashboardBoardRoute._addFileChildren(
+  DashboardBoardRouteChildren,
+)
+
 interface DashboardRouteChildren {
-  DashboardBoardRoute: typeof DashboardBoardRoute
+  DashboardBoardRoute: typeof DashboardBoardRouteWithChildren
   DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
@@ -505,7 +555,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
-  DashboardBoardRoute: DashboardBoardRoute,
+  DashboardBoardRoute: DashboardBoardRouteWithChildren,
   DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardProductsRoute: DashboardProductsRoute,
