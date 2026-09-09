@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard/customers'
 import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
+import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
 import { Route as DashboardSettingsCompanyRouteImport } from './routes/dashboard/settings/company'
@@ -58,6 +59,11 @@ const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
 const DashboardNotificationsRoute = DashboardNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardProductsRoute = DashboardProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardProfileRoute = DashboardProfileRouteImport.update({
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard/customers'
     | '/dashboard/notifications'
+    | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
     | '/dashboard/'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard/customers'
     | '/dashboard/notifications'
+    | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
     | '/dashboard'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard/customers'
     | '/dashboard/notifications'
+    | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/vendors'
     | '/dashboard/'
@@ -321,6 +333,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/dashboard/notifications'
       preLoaderRoute: typeof DashboardNotificationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/products': {
+      id: '/dashboard/products'
+      path: '/products'
+      fullPath: '/dashboard/products'
+      preLoaderRoute: typeof DashboardProductsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/profile': {
@@ -427,6 +446,7 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteChildren {
   DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
+  DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardVendorsRoute: typeof DashboardVendorsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -447,6 +467,7 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
+  DashboardProductsRoute: DashboardProductsRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardVendorsRoute: DashboardVendorsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
