@@ -467,6 +467,12 @@ function Page() {
             </Card>
           ))}
       </div>
+        </TabsContent>
+
+        <TabsContent value="costs" className="space-y-4">
+          <CostsTab orderId={orderId} companyId={company?.id ?? null} canEdit={isManager} />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={!!assignTarget} onOpenChange={(o) => !o && setAssignTarget(null)}>
         <DialogContent>
