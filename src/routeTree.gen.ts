@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClockRouteImport } from './routes/clock'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ClockIndexRouteImport } from './routes/clock/index'
 import { Route as ClockAmendmentRouteImport } from './routes/clock/amendment'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardBoardRouteImport } from './routes/dashboard/board'
@@ -62,6 +63,11 @@ const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ClockIndexRoute = ClockIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ClockRoute,
 } as any)
 const ClockAmendmentRoute = ClockAmendmentRouteImport.update({
   id: '/amendment',
@@ -234,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
+  '/clock/': typeof ClockIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
   '/dashboard/orders/$orderId': typeof DashboardOrdersOrderIdRoute
@@ -254,7 +261,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/clock': typeof ClockRouteWithChildren
   '/login': typeof LoginRoute
   '/clock/amendment': typeof ClockAmendmentRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
@@ -267,6 +273,7 @@ export interface FileRoutesByTo {
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
+  '/clock': typeof ClockIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
   '/dashboard/orders/$orderId': typeof DashboardOrdersOrderIdRoute
@@ -303,6 +310,7 @@ export interface FileRoutesById {
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
+  '/clock/': typeof ClockIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
   '/dashboard/orders/$orderId': typeof DashboardOrdersOrderIdRoute
@@ -340,6 +348,7 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/purchases'
     | '/dashboard/vendors'
+    | '/clock/'
     | '/dashboard/'
     | '/dashboard/board/tv'
     | '/dashboard/orders/$orderId'
@@ -360,7 +369,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/clock'
     | '/login'
     | '/clock/amendment'
     | '/dashboard/customers'
@@ -373,6 +381,7 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/purchases'
     | '/dashboard/vendors'
+    | '/clock'
     | '/dashboard'
     | '/dashboard/board/tv'
     | '/dashboard/orders/$orderId'
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/purchases'
     | '/dashboard/vendors'
+    | '/clock/'
     | '/dashboard/'
     | '/dashboard/board/tv'
     | '/dashboard/orders/$orderId'
@@ -463,6 +473,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/clock/': {
+      id: '/clock/'
+      path: '/'
+      fullPath: '/clock/'
+      preLoaderRoute: typeof ClockIndexRouteImport
+      parentRoute: typeof ClockRoute
     }
     '/clock/amendment': {
       id: '/clock/amendment'
@@ -672,10 +689,12 @@ declare module '@tanstack/react-router' {
 
 interface ClockRouteChildren {
   ClockAmendmentRoute: typeof ClockAmendmentRoute
+  ClockIndexRoute: typeof ClockIndexRoute
 }
 
 const ClockRouteChildren: ClockRouteChildren = {
   ClockAmendmentRoute: ClockAmendmentRoute,
+  ClockIndexRoute: ClockIndexRoute,
 }
 
 const ClockRouteWithChildren = ClockRoute._addFileChildren(ClockRouteChildren)
