@@ -21,6 +21,7 @@ import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/n
 import { Route as DashboardOutsourceRouteImport } from './routes/dashboard/outsource'
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
+import { Route as DashboardPurchasesRouteImport } from './routes/dashboard/purchases'
 import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
 import { Route as DashboardBoardIndexRouteImport } from './routes/dashboard/board/index'
 import { Route as DashboardBoardTvRouteImport } from './routes/dashboard/board/tv'
@@ -97,6 +98,11 @@ const DashboardProductsRoute = DashboardProductsRouteImport.update({
 const DashboardProfileRoute = DashboardProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardPurchasesRoute = DashboardPurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardVendorsRoute = DashboardVendorsRouteImport.update({
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/dashboard/outsource'
     | '/dashboard/products'
     | '/dashboard/profile'
+    | '/dashboard/purchases'
     | '/dashboard/vendors'
     | '/dashboard/'
     | '/dashboard/board/tv'
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/dashboard/outsource'
     | '/dashboard/products'
     | '/dashboard/profile'
+    | '/dashboard/purchases'
     | '/dashboard/vendors'
     | '/dashboard'
     | '/dashboard/board/tv'
@@ -359,6 +370,7 @@ export interface FileRouteTypes {
     | '/dashboard/outsource'
     | '/dashboard/products'
     | '/dashboard/profile'
+    | '/dashboard/purchases'
     | '/dashboard/vendors'
     | '/dashboard/'
     | '/dashboard/board/tv'
@@ -469,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/dashboard/profile'
       preLoaderRoute: typeof DashboardProfileRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/purchases': {
+      id: '/dashboard/purchases'
+      path: '/purchases'
+      fullPath: '/dashboard/purchases'
+      preLoaderRoute: typeof DashboardPurchasesRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/vendors': {
@@ -616,6 +635,7 @@ interface DashboardRouteChildren {
   DashboardOutsourceRoute: typeof DashboardOutsourceRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
+  DashboardPurchasesRoute: typeof DashboardPurchasesRoute
   DashboardVendorsRoute: typeof DashboardVendorsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardOrdersOrderIdRoute: typeof DashboardOrdersOrderIdRoute
@@ -643,6 +663,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardOutsourceRoute: DashboardOutsourceRoute,
   DashboardProductsRoute: DashboardProductsRoute,
   DashboardProfileRoute: DashboardProfileRoute,
+  DashboardPurchasesRoute: DashboardPurchasesRoute,
   DashboardVendorsRoute: DashboardVendorsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardOrdersOrderIdRoute: DashboardOrdersOrderIdRoute,
