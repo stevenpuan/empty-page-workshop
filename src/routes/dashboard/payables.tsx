@@ -386,7 +386,7 @@ function PayableDetail({ payable }: { payable: Payable }) {
         .select("id, amount, payment:payments(payment_no, pay_date, method, status)")
         .eq("payable_id", payable.id);
       if (error) throw error;
-      return (data ?? []) as {
+      return (data ?? []) as unknown as {
         id: string;
         amount: number;
         payment?: {
