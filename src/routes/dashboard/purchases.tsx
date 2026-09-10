@@ -414,6 +414,7 @@ function Page() {
                 <TableHead className="text-right">稅額</TableHead>
                 <TableHead className="text-right">合計</TableHead>
                 <TableHead>狀態</TableHead>
+                <TableHead className="text-right">動作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
