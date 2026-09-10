@@ -318,6 +318,13 @@ function Page() {
         </Card>
       )}
 
+      <Tabs defaultValue="tasks" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="tasks">工序</TabsTrigger>
+          <TabsTrigger value="costs">成本</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tasks" className="space-y-6">
       <Card>
         <CardContent className="p-0 overflow-x-auto">
           <Table>
