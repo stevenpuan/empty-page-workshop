@@ -187,6 +187,64 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
       : null,
   ].filter((x): x is { title: string; route: string; icon: string; badge: number } => !!x);
 
+  // 採購與應付（grp_ap）：menus 尚未收錄時由前端補齊，確保三項集中在同一群組。
+  // 資料來源仍以資料庫為準；這裡只補「資料庫沒有的那幾項」，不覆寫已有資料。
+  const AP_GROUP = "grp_ap";
+  const AP_ITEMS: MenuRow[] = [
+    {
+      id: "ap_vendors",
+      menu_key: "vendors",
+      parent_id: AP_GROUP,
+      title: "廠商",
+      icon: "Store",
+      route: "/dashboard/vendors",
+      module_key: "vendors",
+      min_tier: null,
+      sort_order: 10,
+      is_active: true,
+    },
+    {
+      id: "ap_purchases",
+      menu_key: "purchases",
+      parent_id: AP_GROUP,
+      title: "進貨單",
+      icon: "ShoppingCart",
+      route: "/dashboard/purchases",
+      module_key: "purchases",
+      min_tier: null,
+      sort_order: 20,
+      is_active: true,
+    },
+    {
+      id: "ap_payables",
+      menu_key: "payables",
+      parent_id: AP_GROUP,
+      title: "應付與付款",
+      icon: "Banknote",
+      route: "/dashboard/payables",
+      module_key: "payables",
+      min_tier: null,
+      sort_order: 30,
+      is_active: true,
+    },
+  ];
+  const isApGroup = (g: MenuRow) => g.menu_key === AP_GROUP || g.title === "採購與應付";
+  const hasApGroup = groups.some(isApGroup);
+  const syntheticApGroup: MenuRow | null = hasApGroup
+    ? null
+    : {
+        id: "grp_ap_synthetic",
+        menu_key: AP_GROUP,
+        parent_id: null,
+        title: "採購與應付",
+        icon: "Truck",
+        route: null,
+        module_key: null,
+        min_tier: null,
+        sort_order: 30,
+        is_active: true,
+      };
+
   // 插入位置：「設定」群組之前；找不到則附加在最後
   const settingsIdx = groups.findIndex(
     (g) => g.menu_key.includes("setting") || g.title === "設定",
@@ -199,6 +257,68 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
   const toggle = (key: string, kids: MenuRow[]) =>
     setOpenMap((prev) => ({ ...prev, [key]: !isOpen(key, kids) }));
 
+  // 群組內的項目：資料庫子選單（沿用同一個 visible 過濾）＋ 缺漏項補齊
+  const kidsFor = (g: MenuRow) => {
+    const dbKids = childrenOf(g.id).filter(visible);
+    if (!isApGroup(g)) return dbKids;
+    const have = new Set(dbKids.map((k) => k.route));
+    const missing = AP_ITEMS.filter((k) => !have.has(k.route) && visible(k));
+    return [...dbKids, ...missing].sort((a, b) => a.sort_order - b.sort_order);
+  };
+
+  const renderGroup = (g: MenuRow) => {
+    if (g.route) {
+      if (!visible(g)) return null;
+      return (
+        <SideLink
+          key={g.id}
+          to={g.route}
+          icon={g.icon}
+          title={g.title}
+          active={pathname === g.route}
+          onNavigate={onNavigate}
+        />
+      );
+    }
+    const kids = kidsFor(g);
+    if (!kids.length) return null;
+    const open = isOpen(g.menu_key, kids);
+    return (
+      <div key={g.id} className="pt-1">
+        <button
+          type="button"
+          onClick={() => toggle(g.menu_key, kids)}
+          aria-expanded={open}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-base font-semibold text-foreground/80 hover:bg-accent/50 transition-colors"
+        >
+          <Icon name={g.icon} className="w-5 h-5 shrink-0" />
+          <span className="flex-1 text-left truncate">{g.title}</span>
+          <ChevronDown
+            className={cn(
+              "w-4 h-4 shrink-0 transition-transform",
+              open ? "rotate-0" : "-rotate-90",
+            )}
+          />
+        </button>
+        {open && (
+          <div className="mt-0.5 space-y-0.5">
+            {kids.map((k) => (
+              <SideLink
+                key={k.id}
+                to={k.route!}
+                icon={k.icon}
+                title={k.title}
+                active={pathname === k.route}
+                onNavigate={onNavigate}
+                indent
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const displayName = employee?.name ?? profile?.display_name ?? "—";
   const roleLabel = isPlatformAdmin && !employee ? "系統維護" : (employee?.role?.name ?? "—");
 
@@ -209,58 +329,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-[12px] text-muted-foreground">營運系統</p>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        {groupsBefore.map((g) => {
-          if (g.route) {
-            if (!visible(g)) return null;
-            return (
-              <SideLink
-                key={g.id}
-                to={g.route}
-                icon={g.icon}
-                title={g.title}
-                active={pathname === g.route}
-                onNavigate={onNavigate}
-              />
-            );
-          }
-          const kids = childrenOf(g.id).filter(visible);
-          if (!kids.length) return null;
-          const open = isOpen(g.menu_key, kids);
-          return (
-            <div key={g.id} className="pt-1">
-              <button
-                type="button"
-                onClick={() => toggle(g.menu_key, kids)}
-                aria-expanded={open}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-base font-semibold text-foreground/80 hover:bg-accent/50 transition-colors"
-              >
-                <Icon name={g.icon} className="w-5 h-5 shrink-0" />
-                <span className="flex-1 text-left truncate">{g.title}</span>
-                <ChevronDown
-                  className={cn(
-                    "w-4 h-4 shrink-0 transition-transform",
-                    open ? "rotate-0" : "-rotate-90",
-                  )}
-                />
-              </button>
-              {open && (
-                <div className="mt-0.5 space-y-0.5">
-                  {kids.map((k) => (
-                    <SideLink
-                      key={k.id}
-                      to={k.route!}
-                      icon={k.icon}
-                      title={k.title}
-                      active={pathname === k.route}
-                      onNavigate={onNavigate}
-                      indent
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {groupsBefore.map(renderGroup)}
         {extraItems.map((item) => (
           <SideLink
             key={item.route}
@@ -272,58 +341,8 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
             badge={item.badge}
           />
         ))}
-        {groupsAfter.map((g) => {
-          if (g.route) {
-            if (!visible(g)) return null;
-            return (
-              <SideLink
-                key={g.id}
-                to={g.route}
-                icon={g.icon}
-                title={g.title}
-                active={pathname === g.route}
-                onNavigate={onNavigate}
-              />
-            );
-          }
-          const kids = childrenOf(g.id).filter(visible);
-          if (!kids.length) return null;
-          const open = isOpen(g.menu_key, kids);
-          return (
-            <div key={g.id} className="pt-1">
-              <button
-                type="button"
-                onClick={() => toggle(g.menu_key, kids)}
-                aria-expanded={open}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-base font-semibold text-foreground/80 hover:bg-accent/50 transition-colors"
-              >
-                <Icon name={g.icon} className="w-5 h-5 shrink-0" />
-                <span className="flex-1 text-left truncate">{g.title}</span>
-                <ChevronDown
-                  className={cn(
-                    "w-4 h-4 shrink-0 transition-transform",
-                    open ? "rotate-0" : "-rotate-90",
-                  )}
-                />
-              </button>
-              {open && (
-                <div className="mt-0.5 space-y-0.5">
-                  {kids.map((k) => (
-                    <SideLink
-                      key={k.id}
-                      to={k.route!}
-                      icon={k.icon}
-                      title={k.title}
-                      active={pathname === k.route}
-                      onNavigate={onNavigate}
-                      indent
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {syntheticApGroup && renderGroup(syntheticApGroup)}
+        {groupsAfter.map(renderGroup)}
       </nav>
       <div className="border-t p-3">
         <div className="flex items-center gap-2 px-2 py-1.5">
