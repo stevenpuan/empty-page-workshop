@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Truck, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
-import { fmtDate, fmtDateTime, taipeiToday } from "@/lib/dates";
+import { fmtDate, fmtDateTime, formatTWD, taipeiToday } from "@/lib/dates";
 import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { RequirePerm } from "@/components/RequirePerm";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -40,6 +40,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/dashboard/orders/$orderId")({
   head: () => ({
