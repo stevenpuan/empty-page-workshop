@@ -719,6 +719,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 interface CostSummaryRow {
   order_id: string;
   revenue?: number | string | null;
+  amount_total?: number | string | null;
   material_cost?: number | string | null;
   outsource_cost?: number | string | null;
   labor_cost?: number | string | null;
