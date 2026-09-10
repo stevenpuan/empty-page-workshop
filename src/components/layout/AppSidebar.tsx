@@ -371,7 +371,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
                 to={k.route!}
                 icon={k.icon}
                 title={k.title}
-                active={pathname === k.route}
+                active={isRouteActive(k.route)}
                 onNavigate={onNavigate}
                 indent
               />
