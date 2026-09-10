@@ -93,9 +93,12 @@ function ClockPage() {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-  const weekday = WEEKDAYS[
-    Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", weekday: "short" }).formatToParts(now).length ? 0 : 0)
-  ];
+  const weekdayName = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    weekday: "short",
+  }).format(now);
+  const weekday =
+    WEEKDAYS[["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekdayName)] ?? "";
 
   const { data: att, refetch } = useQuery({
     queryKey: ["attendance_today", empId, today],
