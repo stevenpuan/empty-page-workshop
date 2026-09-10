@@ -245,12 +245,70 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         is_active: true,
       };
 
+  // 出勤群組（grp_attendance）：menus 尚未收錄時由前端補齊；打卡全角色可見，出勤管理限 manager 以上
+  const ATT_GROUP = "grp_attendance";
+  const ATT_ITEMS: MenuRow[] = [
+    {
+      id: "att_clock",
+      menu_key: "clock",
+      parent_id: ATT_GROUP,
+      title: "打卡",
+      icon: "Clock",
+      route: "/clock",
+      module_key: null,
+      min_tier: null,
+      sort_order: 10,
+      is_active: true,
+    },
+    {
+      id: "att_manage",
+      menu_key: "attendance",
+      parent_id: ATT_GROUP,
+      title: "出勤管理",
+      icon: "CalendarCheck",
+      route: "/attendance",
+      module_key: null,
+      min_tier: "manager",
+      sort_order: 20,
+      is_active: true,
+    },
+  ];
+  const isAttGroup = (g: MenuRow) => g.menu_key === ATT_GROUP || g.title === "出勤";
+  const hasAttMenu = menus.some((m) => m.route === "/clock" || m.route === "/attendance");
+  const syntheticAttGroup: MenuRow | null =
+    groups.some(isAttGroup) || hasAttMenu
+      ? null
+      : {
+          id: "grp_attendance_synthetic",
+          menu_key: ATT_GROUP,
+          parent_id: null,
+          title: "出勤",
+          icon: "Clock",
+          route: null,
+          module_key: null,
+          min_tier: null,
+          sort_order: 25,
+          is_active: true,
+        };
+
   // 插入位置：「設定」群組之前；找不到則附加在最後
   const settingsIdx = groups.findIndex(
     (g) => g.menu_key.includes("setting") || g.title === "設定",
   );
-  const groupsBefore = settingsIdx >= 0 ? groups.slice(0, settingsIdx) : groups;
+  let groupsBefore = settingsIdx >= 0 ? groups.slice(0, settingsIdx) : groups;
   const groupsAfter = settingsIdx >= 0 ? groups.slice(settingsIdx) : [];
+  // 出勤群組放在「看板」之後；找不到看板則接在最後
+  if (syntheticAttGroup) {
+    const boardIdx = groupsBefore.findIndex(
+      (g) => g.route === "/dashboard/board" || g.menu_key === "board" || g.title === "派工看板",
+    );
+    const insertAt = boardIdx >= 0 ? boardIdx + 1 : groupsBefore.length;
+    groupsBefore = [
+      ...groupsBefore.slice(0, insertAt),
+      syntheticAttGroup,
+      ...groupsBefore.slice(insertAt),
+    ];
+  }
 
   const isOpen = (key: string, kids: MenuRow[]) =>
     key in openMap ? openMap[key] : kids.some((k) => k.route === pathname);
