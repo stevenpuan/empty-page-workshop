@@ -318,11 +318,16 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
   // 群組內的項目：資料庫子選單（沿用同一個 visible 過濾）＋ 缺漏項補齊
   const kidsFor = (g: MenuRow) => {
     const dbKids = childrenOf(g.id).filter(visible);
-    if (!isApGroup(g)) return dbKids;
+    const extras = isApGroup(g) ? AP_ITEMS : isAttGroup(g) ? ATT_ITEMS : null;
+    if (!extras) return dbKids;
     const have = new Set(dbKids.map((k) => k.route));
-    const missing = AP_ITEMS.filter((k) => !have.has(k.route) && visible(k));
+    const missing = extras.filter((k) => !have.has(k.route) && visible(k));
     return [...dbKids, ...missing].sort((a, b) => a.sort_order - b.sort_order);
   };
+
+  // 子路由前綴匹配（/clock/amendment 歸屬打卡、/attendance/* 歸屬出勤管理）
+  const isRouteActive = (route: string | null) =>
+    !!route && (pathname === route || pathname.startsWith(route + "/"));
 
   const renderGroup = (g: MenuRow) => {
     if (g.route) {
