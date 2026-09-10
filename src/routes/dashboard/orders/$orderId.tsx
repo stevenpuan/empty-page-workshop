@@ -713,3 +713,315 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+
+// ============== 成本 Tab ==============
+
+interface CostSummaryRow {
+  order_id: string;
+  revenue?: number | string | null;
+  material_cost?: number | string | null;
+  outsource_cost?: number | string | null;
+  labor_cost?: number | string | null;
+  other_cost?: number | string | null;
+  total_cost?: number | string | null;
+  [key: string]: unknown;
+}
+
+interface CostRow {
+  id: string;
+  cost_type: string;
+  source_type: string;
+  amount: number | string;
+  recognized_at: string;
+  note: string | null;
+}
+
+const COST_TYPE_LABEL: Record<string, string> = {
+  material: "材料",
+  outsource: "外包",
+  labor: "人工",
+  other: "其他",
+};
+const SOURCE_TYPE_LABEL: Record<string, string> = {
+  manual: "手動",
+  purchase: "進貨",
+  outsource: "外包",
+  task: "工序",
+};
+
+function num(v: number | string | null | undefined): number {
+  const n = typeof v === "string" ? Number(v) : v;
+  return Number.isFinite(n as number) ? (n as number) : 0;
+}
+
+function CostsTab({
+  orderId,
+  companyId,
+  canEdit,
+}: {
+  orderId: string;
+  companyId: string | null;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+
+  const { data: summary, error: sumErr } = useQuery({
+    queryKey: ["order_cost_summary", orderId],
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("order_cost_summary")
+        .select("*")
+        .eq("order_id", orderId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as CostSummaryRow | null;
+    },
+  });
+
+  const { data: costs = [], error: costErr } = useQuery({
+    queryKey: ["order_costs", orderId],
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("order_costs")
+        .select("*")
+        .eq("order_id", orderId)
+        .order("recognized_at");
+      if (error) throw error;
+      return data as unknown as CostRow[];
+    },
+  });
+
+  if (sumErr || costErr) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        成本功能尚未啟用（{humanizeError(sumErr ?? costErr, "載入成本")}）
+      </p>
+    );
+  }
+
+  const revenue = num(summary?.revenue ?? summary?.amount_total);
+  const material = num(summary?.material_cost);
+  const outsource = num(summary?.outsource_cost);
+  const labor = num(summary?.labor_cost);
+  const other = num(summary?.other_cost);
+  const totalCost = summary?.total_cost != null ? num(summary.total_cost) : material + outsource + labor + other;
+  const grossProfit = revenue - totalCost;
+  const margin = revenue > 0 ? (grossProfit / revenue) * 100 : null;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+            <Field label="訂單金額（營收）" value={formatTWD(revenue)} />
+            <Field label="材料成本" value={formatTWD(material)} />
+            <Field label="外包成本" value={formatTWD(outsource)} />
+            <Field label="人工成本" value={formatTWD(labor)} />
+            <Field label="其他成本" value={formatTWD(other)} />
+            <Field label="成本合計" value={<span className="font-medium">{formatTWD(totalCost)}</span>} />
+            <Field
+              label="毛利"
+              value={
+                <span className={grossProfit < 0 ? "font-semibold text-destructive" : "font-semibold"}>
+                  {formatTWD(grossProfit)}
+                </span>
+              }
+            />
+            <Field
+              label="毛利率"
+              value={
+                margin === null ? (
+                  "—"
+                ) : (
+                  <span className={grossProfit < 0 ? "font-semibold text-destructive" : "font-semibold"}>
+                    {margin.toFixed(1)}%
+                  </span>
+                )
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-muted-foreground">成本明細（{costs.length}）</h3>
+        {canEdit && (
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            手動新增成本
+          </Button>
+        )}
+      </div>
+
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>成本類型</TableHead>
+                <TableHead>來源類型</TableHead>
+                <TableHead className="text-right">金額</TableHead>
+                <TableHead>認列日期</TableHead>
+                <TableHead>備註</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {costs.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>{COST_TYPE_LABEL[c.cost_type] ?? c.cost_type}</TableCell>
+                  <TableCell>{SOURCE_TYPE_LABEL[c.source_type] ?? c.source_type}</TableCell>
+                  <TableCell className="text-right">{formatTWD(c.amount)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {fmtDate(c.recognized_at) || "—"}
+                  </TableCell>
+                  <TableCell className="max-w-[16rem] break-words">{c.note ?? "—"}</TableCell>
+                </TableRow>
+              ))}
+              {costs.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    目前沒有成本紀錄
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <AddCostDialog
+        open={showAdd}
+        orderId={orderId}
+        companyId={companyId}
+        onClose={() => setShowAdd(false)}
+        onDone={() => {
+          void qc.invalidateQueries({ queryKey: ["order_costs", orderId] });
+          void qc.invalidateQueries({ queryKey: ["order_cost_summary", orderId] });
+        }}
+      />
+    </div>
+  );
+}
+
+function AddCostDialog({
+  open,
+  orderId,
+  companyId,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  orderId: string;
+  companyId: string | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [costType, setCostType] = useState("material");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setCostType("material");
+      setAmount("");
+      setDate(taipeiToday());
+      setNote("");
+    }
+  }, [open]);
+
+  const submit = async () => {
+    if (!companyId) return;
+    const amt = Number(amount);
+    if (!amount || !Number.isFinite(amt) || amt <= 0) {
+      toast.error("請填寫正確的成本金額");
+      return;
+    }
+    if (!date) {
+      toast.error("請選擇認列日期");
+      return;
+    }
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("order_costs")
+      .insert({
+        company_id: companyId,
+        order_id: orderId,
+        cost_type: costType,
+        source_type: "manual",
+        amount: amt,
+        recognized_at: date,
+        note: note.trim() || null,
+      })
+      .select("id");
+    setSaving(false);
+    if (error) {
+      toast.error(humanizeError(error, "新增成本"));
+      return;
+    }
+    if (!data || data.length === 0) {
+      toast.error(humanizeError(null, "新增成本（寫入 0 筆）"));
+      return;
+    }
+    toast.success("已新增成本");
+    onDone();
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>手動新增成本</DialogTitle>
+          <DialogDescription>來源類型固定為「手動」，認列後計入該訂單成本。</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>成本類型 *</Label>
+            <Select value={costType} onValueChange={setCostType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(COST_TYPE_LABEL).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>金額 *</Label>
+            <Input
+              type="number"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>認列日期 *</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>備註</Label>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={() => void submit()} disabled={saving}>
+            {saving ? "儲存中…" : "確認新增"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
