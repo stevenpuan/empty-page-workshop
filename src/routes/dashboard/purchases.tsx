@@ -457,6 +457,18 @@ function Page() {
                       {STATUS_LABEL[p.status] ?? p.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    {canEdit && p.status === "draft" && (
+                      <Button size="sm" onClick={() => confirmPurchase(p)}>
+                        確認
+                      </Button>
+                    )}
+                    {canEdit && p.status === "confirmed" && (
+                      <Button size="sm" variant="destructive" onClick={() => setVoidTarget(p)}>
+                        作廢
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
