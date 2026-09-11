@@ -291,6 +291,41 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
           is_active: true,
         };
 
+  // 設定群組（grp_settings）：menus 尚未收錄時由前端補齊；通知規則限 manager 以上
+  const SET_GROUP = "grp_settings";
+  const SET_ITEMS: MenuRow[] = [
+    {
+      id: "set_rules",
+      menu_key: "notification_rules",
+      parent_id: SET_GROUP,
+      title: "通知規則",
+      icon: "Settings2",
+      route: "/dashboard/settings/rules",
+      module_key: "notification_rules",
+      min_tier: "manager",
+      sort_order: 40,
+      is_active: true,
+    },
+  ];
+  const isSetGroup = (g: MenuRow) =>
+    g.menu_key === SET_GROUP || g.title === "設定" || (g.menu_key ?? "").includes("setting");
+  const hasSetMenu = menus.some((m) => m.route === "/dashboard/settings/rules");
+  const syntheticSetGroup: MenuRow | null =
+    groups.some(isSetGroup) || hasSetMenu
+      ? null
+      : {
+          id: "grp_settings_synthetic",
+          menu_key: SET_GROUP,
+          parent_id: null,
+          title: "設定",
+          icon: "Settings",
+          route: null,
+          module_key: null,
+          min_tier: null,
+          sort_order: 900,
+          is_active: true,
+        };
+
   // 插入位置：「設定」群組之前；找不到則附加在最後
   const settingsIdx = groups.findIndex(
     (g) => g.menu_key.includes("setting") || g.title === "設定",
@@ -318,7 +353,13 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
   // 群組內的項目：資料庫子選單（沿用同一個 visible 過濾）＋ 缺漏項補齊
   const kidsFor = (g: MenuRow) => {
     const dbKids = childrenOf(g.id).filter(visible);
-    const extras = isApGroup(g) ? AP_ITEMS : isAttGroup(g) ? ATT_ITEMS : null;
+    const extras = isApGroup(g)
+      ? AP_ITEMS
+      : isAttGroup(g)
+        ? ATT_ITEMS
+        : isSetGroup(g)
+          ? SET_ITEMS
+          : null;
     if (!extras) return dbKids;
     const have = new Set(dbKids.map((k) => k.route));
     const missing = extras.filter((k) => !have.has(k.route) && visible(k));
@@ -406,6 +447,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         ))}
         {syntheticApGroup && renderGroup(syntheticApGroup)}
         {groupsAfter.map(renderGroup)}
+        {syntheticSetGroup && renderGroup(syntheticSetGroup)}
       </nav>
       <div className="border-t p-3">
         <div className="flex items-center gap-2 px-2 py-1.5">
