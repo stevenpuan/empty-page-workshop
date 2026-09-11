@@ -4,23 +4,21 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 /**
  * line-webhook — 接收 LINE Messaging API Webhook 事件
  *
- * 用途：
- *   1. 員工在 LINE 傳送「綁定碼」→ 自動綁定帳號
- *   2. 傳送「解綁」→ 解除綁定
- *   3. 傳送「狀態」→ 查看綁定狀態
- *   4. follow 事件 → 歡迎訊息引導綁定
+ * 單一 LINE 官方帳號，所有員工（祥興＋沂融）共用。
+ * 系統透過綁定碼辨識每位員工。
  *
- * Webhook URL 設定：
- *   https://<project>.supabase.co/functions/v1/line-webhook?key=XX
- *   https://<project>.supabase.co/functions/v1/line-webhook?key=YR
+ * Webhook URL：
+ *   https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook
  *
  * 需要的 Secrets：
- *   LINE_CHANNEL_SECRET_XX / LINE_CHANNEL_SECRET_YR  — 驗證簽章
- *   LINE_CHANNEL_TOKEN_XX  / LINE_CHANNEL_TOKEN_YR   — 回覆訊息
+ *   LINE_CHANNEL_SECRET — Channel Secret（驗證簽章）
+ *   LINE_CHANNEL_TOKEN  — Channel Access Token（回覆訊息）
  */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const LINE_CHANNEL_SECRET = Deno.env.get("LINE_CHANNEL_SECRET")!;
+const LINE_CHANNEL_TOKEN = Deno.env.get("LINE_CHANNEL_TOKEN")!;
 
 Deno.serve(async (req: Request) => {
   // Only accept POST
@@ -28,24 +26,10 @@ Deno.serve(async (req: Request) => {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  const url = new URL(req.url);
-  const channelKey = (url.searchParams.get("key") || "").toUpperCase();
-
-  if (!channelKey) {
+  if (!LINE_CHANNEL_SECRET || !LINE_CHANNEL_TOKEN) {
+    console.error("Missing LINE_CHANNEL_SECRET or LINE_CHANNEL_TOKEN");
     return new Response(
-      JSON.stringify({ error: "Missing ?key= parameter" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // Get channel secret & token from env
-  const channelSecret = Deno.env.get(`LINE_CHANNEL_SECRET_${channelKey}`);
-  const channelToken = Deno.env.get(`LINE_CHANNEL_TOKEN_${channelKey}`);
-
-  if (!channelSecret || !channelToken) {
-    console.error(`Missing LINE secrets for key: ${channelKey}`);
-    return new Response(
-      JSON.stringify({ error: "Channel not configured" }),
+      JSON.stringify({ error: "LINE not configured" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -55,7 +39,7 @@ Deno.serve(async (req: Request) => {
 
   // Verify LINE signature
   const signature = req.headers.get("x-line-signature") || "";
-  const valid = await verifySignature(channelSecret, bodyText, signature);
+  const valid = await verifySignature(LINE_CHANNEL_SECRET, bodyText, signature);
   if (!valid) {
     console.error("Invalid LINE signature");
     return new Response(
@@ -80,7 +64,7 @@ Deno.serve(async (req: Request) => {
   const results: unknown[] = [];
   for (const event of events) {
     try {
-      const result = await handleEvent(event, channelKey, channelToken);
+      const result = await handleEvent(event);
       results.push(result);
     } catch (err) {
       console.error("Event handling error:", err);
@@ -104,17 +88,13 @@ interface LineEvent {
   message?: { type: string; text?: string };
 }
 
-async function handleEvent(
-  event: LineEvent,
-  channelKey: string,
-  channelToken: string
-): Promise<unknown> {
+async function handleEvent(event: LineEvent): Promise<unknown> {
   const lineUserId = event.source?.userId;
   if (!lineUserId) return { skipped: "no userId" };
 
   // ── follow 事件：用戶加好友 ──
   if (event.type === "follow") {
-    await replyMessage(channelToken, event.replyToken!, [
+    await replyMessage(event.replyToken!, [
       {
         type: "text",
         text:
@@ -133,17 +113,17 @@ async function handleEvent(
 
     // 指令：解綁
     if (text === "解綁") {
-      return await handleUnbind(lineUserId, channelToken, event.replyToken!);
+      return await handleUnbind(lineUserId, event.replyToken!);
     }
 
     // 指令：狀態 / 查詢
     if (text === "狀態" || text === "查詢") {
-      return await handleStatus(lineUserId, channelToken, event.replyToken!);
+      return await handleStatus(lineUserId, event.replyToken!);
     }
 
     // 指令：幫助 / help
     if (text === "幫助" || text === "help" || text === "?") {
-      await replyMessage(channelToken, event.replyToken!, [
+      await replyMessage(event.replyToken!, [
         {
           type: "text",
           text:
@@ -160,17 +140,11 @@ async function handleEvent(
     // 嘗試當作綁定碼（6 碼英數）
     const codePattern = /^[A-Za-z0-9]{6}$/;
     if (codePattern.test(text)) {
-      return await handleBind(
-        text.toUpperCase(),
-        lineUserId,
-        channelKey,
-        channelToken,
-        event.replyToken!
-      );
+      return await handleBind(text.toUpperCase(), lineUserId, event.replyToken!);
     }
 
     // 其他訊息 → 提示
-    await replyMessage(channelToken, event.replyToken!, [
+    await replyMessage(event.replyToken!, [
       {
         type: "text",
         text: "我不太理解你的訊息。\n輸入「幫助」查看可用指令。",
@@ -187,8 +161,6 @@ async function handleEvent(
 async function handleBind(
   code: string,
   lineUserId: string,
-  channelKey: string,
-  channelToken: string,
   replyToken: string
 ): Promise<unknown> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -200,7 +172,7 @@ async function handleBind(
 
   if (error) {
     console.error("bind_line_account RPC error:", error);
-    await replyMessage(channelToken, replyToken, [
+    await replyMessage(replyToken, [
       { type: "text", text: "系統錯誤，請稍後重試或聯繫主管。" },
     ]);
     return { type: "bind", error: error.message };
@@ -214,7 +186,7 @@ async function handleBind(
   };
 
   if (result.ok) {
-    await replyMessage(channelToken, replyToken, [
+    await replyMessage(replyToken, [
       {
         type: "text",
         text:
@@ -224,7 +196,7 @@ async function handleBind(
       },
     ]);
   } else {
-    await replyMessage(channelToken, replyToken, [
+    await replyMessage(replyToken, [
       { type: "text", text: `❌ ${result.message}` },
     ]);
   }
@@ -236,12 +208,10 @@ async function handleBind(
 
 async function handleUnbind(
   lineUserId: string,
-  channelToken: string,
   replyToken: string
 ): Promise<unknown> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // 找到此 LINE 綁定的員工
   const { data: emp } = await supabase
     .from("employees")
     .select("id, name")
@@ -249,7 +219,7 @@ async function handleUnbind(
     .maybeSingle();
 
   if (!emp) {
-    await replyMessage(channelToken, replyToken, [
+    await replyMessage(replyToken, [
       { type: "text", text: "你目前沒有綁定任何帳號。" },
     ]);
     return { type: "unbind", found: false };
@@ -257,7 +227,7 @@ async function handleUnbind(
 
   await supabase.rpc("unbind_line_account", { p_employee_id: emp.id });
 
-  await replyMessage(channelToken, replyToken, [
+  await replyMessage(replyToken, [
     {
       type: "text",
       text:
@@ -273,7 +243,6 @@ async function handleUnbind(
 
 async function handleStatus(
   lineUserId: string,
-  channelToken: string,
   replyToken: string
 ): Promise<unknown> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -285,7 +254,7 @@ async function handleStatus(
     .maybeSingle();
 
   if (!emp) {
-    await replyMessage(channelToken, replyToken, [
+    await replyMessage(replyToken, [
       {
         type: "text",
         text: "你目前尚未綁定。\n請輸入你的【6碼綁定碼】完成綁定。",
@@ -305,7 +274,7 @@ async function handleStatus(
     ? new Date(emp.line_bind_at).toLocaleDateString("zh-TW")
     : "未知";
 
-  await replyMessage(channelToken, replyToken, [
+  await replyMessage(replyToken, [
     {
       type: "text",
       text:
@@ -323,7 +292,6 @@ async function handleStatus(
 // ── LINE Reply API ───────────────────────────────────────────
 
 async function replyMessage(
-  channelToken: string,
   replyToken: string,
   messages: Array<{ type: string; text: string }>
 ): Promise<void> {
@@ -331,7 +299,7 @@ async function replyMessage(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${channelToken}`,
+      Authorization: `Bearer ${LINE_CHANNEL_TOKEN}`,
     },
     body: JSON.stringify({ replyToken, messages }),
   });

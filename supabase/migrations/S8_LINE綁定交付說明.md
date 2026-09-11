@@ -42,6 +42,11 @@
 
 ## 三、Edge Function: line-webhook
 
+### 架構：單一 LINE 官方帳號
+
+所有員工（祥興印刷＋沂融企業社）共用同一個 LINE 官方帳號。
+系統透過員工各自的 6 碼綁定碼辨識身份，綁定後以 `line_user_id` 識別每位員工。
+
 ### 功能
 
 接收 LINE Messaging API 的 Webhook 事件，支援：
@@ -55,13 +60,14 @@
 ### Webhook URL
 
 ```
-祥興印刷：https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook?key=XX
-沂融企業社：https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook?key=YR
+https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook
 ```
+
+（單一 URL，不需 `?key=` 參數）
 
 ### 安全設計
 
-- **簽章驗證**：使用 `LINE_CHANNEL_SECRET_{key}` 驗證 `x-line-signature`（HMAC-SHA256）
+- **簽章驗證**：使用 `LINE_CHANNEL_SECRET` 驗證 `x-line-signature`（HMAC-SHA256）
 - **綁定碼防碰撞**：唯一索引 + loop 重試
 - **一 LINE 一員工**：同一 LINE user_id 不可綁定多個員工
 - **已綁定保護**：已綁定的帳號需主管重新產碼才能改綁
@@ -70,17 +76,15 @@
 
 | Secret 名稱 | 來源 |
 |-------------|------|
-| `LINE_CHANNEL_TOKEN_XX` | 祥興印刷 LINE Official Account → Messaging API → Channel Access Token |
-| `LINE_CHANNEL_TOKEN_YR` | 沂融企業社 LINE Official Account → Channel Access Token |
-| `LINE_CHANNEL_SECRET_XX` | 祥興印刷 → Channel Secret |
-| `LINE_CHANNEL_SECRET_YR` | 沂融企業社 → Channel Secret |
+| `LINE_CHANNEL_SECRET` | LINE Official Account → Messaging API → Channel Secret |
+| `LINE_CHANNEL_TOKEN` | LINE Official Account → Messaging API → Channel Access Token |
 
 ## 四、LINE 官方帳號設定步驟
 
 ### 1. 建立 LINE Official Account（如尚未建立）
 
 1. 前往 [LINE Official Account Manager](https://manager.line.biz/)
-2. 建立帳號（祥興印刷 / 沂融企業社各一個）
+2. 建立一個帳號（祥興＋沂融共用）
 3. 進入「設定」→「Messaging API」→ 啟用
 
 ### 2. 取得 Channel 資訊
@@ -94,25 +98,17 @@
 
 1. LINE Developers Console → Channel → Messaging API
 2. Webhook URL 填入：
-   - 祥興：`https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook?key=XX`
-   - 沂融：`https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook?key=YR`
+   ```
+   https://sfpjbimwmhqpywjsfhgl.supabase.co/functions/v1/line-webhook
+   ```
 3. 開啟「Use webhook」
 4. 關閉「Auto-reply messages」（系統接管回覆）
 
 ### 4. 存入 Supabase Secrets
 
 在 Supabase Dashboard → Project Settings → Edge Functions → Secrets 新增：
-- `LINE_CHANNEL_TOKEN_XX` = 祥興的 Channel Access Token
-- `LINE_CHANNEL_TOKEN_YR` = 沂融的 Channel Access Token
-- `LINE_CHANNEL_SECRET_XX` = 祥興的 Channel Secret
-- `LINE_CHANNEL_SECRET_YR` = 沂融的 Channel Secret
-
-### 5. 設定 companies 表的 line_channel_key
-
-```sql
-UPDATE companies SET line_channel_key = 'XX' WHERE short_code = 'XX';
-UPDATE companies SET line_channel_key = 'YR' WHERE short_code = 'YR';
-```
+- `LINE_CHANNEL_SECRET` = Channel Secret
+- `LINE_CHANNEL_TOKEN` = Channel Access Token
 
 ## 五、員工綁定流程
 
