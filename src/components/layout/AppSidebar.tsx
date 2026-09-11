@@ -447,6 +447,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         ))}
         {syntheticApGroup && renderGroup(syntheticApGroup)}
         {groupsAfter.map(renderGroup)}
+        {syntheticSetGroup && renderGroup(syntheticSetGroup)}
       </nav>
       <div className="border-t p-3">
         <div className="flex items-center gap-2 px-2 py-1.5">
