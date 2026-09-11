@@ -308,7 +308,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
     },
   ];
   const isSetGroup = (g: MenuRow) =>
-    g.menu_key === SET_GROUP || g.title === "設定" || g.menu_key.includes("setting");
+    g.menu_key === SET_GROUP || g.title === "設定" || (g.menu_key ?? "").includes("setting");
   const hasSetMenu = menus.some((m) => m.route === "/dashboard/settings/rules");
   const syntheticSetGroup: MenuRow | null =
     groups.some(isSetGroup) || hasSetMenu
