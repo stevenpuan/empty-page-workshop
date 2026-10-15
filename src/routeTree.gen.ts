@@ -27,9 +27,9 @@ import { Route as DashboardPayablesRouteImport } from './routes/dashboard/payabl
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardPurchasesRouteImport } from './routes/dashboard/purchases'
-import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
 import { Route as DashboardQuotationsRouteImport } from './routes/dashboard/quotations'
 import { Route as DashboardReceivablesRouteImport } from './routes/dashboard/receivables'
+import { Route as DashboardVendorsRouteImport } from './routes/dashboard/vendors'
 import { Route as DashboardBoardIndexRouteImport } from './routes/dashboard/board/index'
 import { Route as DashboardBoardTvRouteImport } from './routes/dashboard/board/tv'
 import { Route as DashboardOrdersIndexRouteImport } from './routes/dashboard/orders/index'
@@ -137,11 +137,6 @@ const DashboardPurchasesRoute = DashboardPurchasesRouteImport.update({
   path: '/purchases',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardVendorsRoute = DashboardVendorsRouteImport.update({
-  id: '/vendors',
-  path: '/vendors',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardQuotationsRoute = DashboardQuotationsRouteImport.update({
   id: '/quotations',
   path: '/quotations',
@@ -150,6 +145,11 @@ const DashboardQuotationsRoute = DashboardQuotationsRouteImport.update({
 const DashboardReceivablesRoute = DashboardReceivablesRouteImport.update({
   id: '/receivables',
   path: '/receivables',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardVendorsRoute = DashboardVendorsRouteImport.update({
+  id: '/vendors',
+  path: '/vendors',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardBoardIndexRoute = DashboardBoardIndexRouteImport.update({
@@ -258,9 +258,9 @@ export interface FileRoutesByFullPath {
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
-  '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/quotations': typeof DashboardQuotationsRoute
   '/dashboard/receivables': typeof DashboardReceivablesRoute
+  '/dashboard/vendors': typeof DashboardVendorsRoute
   '/clock/': typeof ClockIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
@@ -294,6 +294,8 @@ export interface FileRoutesByTo {
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
+  '/dashboard/quotations': typeof DashboardQuotationsRoute
+  '/dashboard/receivables': typeof DashboardReceivablesRoute
   '/dashboard/vendors': typeof DashboardVendorsRoute
   '/clock': typeof ClockIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -332,9 +334,9 @@ export interface FileRoutesById {
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
-  '/dashboard/vendors': typeof DashboardVendorsRoute
   '/dashboard/quotations': typeof DashboardQuotationsRoute
   '/dashboard/receivables': typeof DashboardReceivablesRoute
+  '/dashboard/vendors': typeof DashboardVendorsRoute
   '/clock/': typeof ClockIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/board/tv': typeof DashboardBoardTvRoute
@@ -373,9 +375,9 @@ export interface FileRouteTypes {
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/purchases'
-    | '/dashboard/vendors'
     | '/dashboard/quotations'
     | '/dashboard/receivables'
+    | '/dashboard/vendors'
     | '/clock/'
     | '/dashboard/'
     | '/dashboard/board/tv'
@@ -409,9 +411,9 @@ export interface FileRouteTypes {
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/purchases'
-    | '/dashboard/vendors'
     | '/dashboard/quotations'
     | '/dashboard/receivables'
+    | '/dashboard/vendors'
     | '/clock'
     | '/dashboard'
     | '/dashboard/board/tv'
@@ -448,9 +450,9 @@ export interface FileRouteTypes {
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/purchases'
-    | '/dashboard/vendors'
     | '/dashboard/quotations'
     | '/dashboard/receivables'
+    | '/dashboard/vendors'
     | '/clock/'
     | '/dashboard/'
     | '/dashboard/board/tv'
@@ -607,13 +609,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPurchasesRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/vendors': {
-      id: '/dashboard/vendors'
-      path: '/vendors'
-      fullPath: '/dashboard/vendors'
-      preLoaderRoute: typeof DashboardVendorsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/quotations': {
       id: '/dashboard/quotations'
       path: '/quotations'
@@ -626,6 +621,13 @@ declare module '@tanstack/react-router' {
       path: '/receivables'
       fullPath: '/dashboard/receivables'
       preLoaderRoute: typeof DashboardReceivablesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/vendors': {
+      id: '/dashboard/vendors'
+      path: '/vendors'
+      fullPath: '/dashboard/vendors'
+      preLoaderRoute: typeof DashboardVendorsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/board/': {
@@ -780,9 +782,9 @@ interface DashboardRouteChildren {
   DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardPurchasesRoute: typeof DashboardPurchasesRoute
-  DashboardVendorsRoute: typeof DashboardVendorsRoute
   DashboardQuotationsRoute: typeof DashboardQuotationsRoute
   DashboardReceivablesRoute: typeof DashboardReceivablesRoute
+  DashboardVendorsRoute: typeof DashboardVendorsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardOrdersOrderIdRoute: typeof DashboardOrdersOrderIdRoute
   DashboardSettingsCompanyRoute: typeof DashboardSettingsCompanyRoute
@@ -811,9 +813,9 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardProductsRoute: DashboardProductsRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardPurchasesRoute: DashboardPurchasesRoute,
-  DashboardVendorsRoute: DashboardVendorsRoute,
   DashboardQuotationsRoute: DashboardQuotationsRoute,
   DashboardReceivablesRoute: DashboardReceivablesRoute,
+  DashboardVendorsRoute: DashboardVendorsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardOrdersOrderIdRoute: DashboardOrdersOrderIdRoute,
   DashboardSettingsCompanyRoute: DashboardSettingsCompanyRoute,

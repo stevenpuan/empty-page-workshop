@@ -536,7 +536,7 @@ function QuotationDialog({
   const updateItem = (idx: number, patch: Partial<QuotationItem>) => {
     setItems((prev) => {
       const next = [...prev];
-      const cur = { ...next[idx], ...patch };
+      const cur = { ...next[idx], ...patch } as QuotationItem;
       cur.amount = num(cur.qty) * num(cur.unit_price);
       next[idx] = cur;
       return next;
