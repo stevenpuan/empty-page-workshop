@@ -74,7 +74,7 @@ function TvPage() {
       const { data, error } = await supabase
         .from("order_tasks")
         .select(
-          "id, status, blocked_reason, assignee_id, station_id, order_id, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:outsource_vendor_id(name)",
+          "id, status, blocked_reason, assignee_id, station_id, order_id, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
         )
         .order("created_at", { ascending: true });
       if (error) throw error;
