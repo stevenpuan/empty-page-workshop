@@ -362,7 +362,10 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
           : null;
     if (!extras) return dbKids;
     const have = new Set(dbKids.map((k) => k.route));
-    const missing = extras.filter((k) => !have.has(k.route) && visible(k));
+    const haveKey = new Set(dbKids.map((k) => k.menu_key));
+    const missing = extras.filter(
+      (k) => !have.has(k.route) && !haveKey.has(k.menu_key) && visible(k),
+    );
     return [...dbKids, ...missing].sort((a, b) => a.sort_order - b.sort_order);
   };
 
