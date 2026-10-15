@@ -32,10 +32,10 @@ BEGIN
 
   -- ---------- 3. 廠商 ----------
   INSERT INTO public.vendors (id, company_id, vendor_code, name, vendor_type, contact, phone, payment_term, is_outsource, is_active) VALUES
-    ('33333333-0000-4000-8000-000000000001', v_company, 'V001', '永豐紙業',       '材料', '周先生', '02-1111-2222', 'net30', false, true),
-    ('33333333-0000-4000-8000-000000000002', v_company, 'V002', '東洋油墨行',     '材料', '吳小姐', '02-3333-4444', 'cash',  false, true),
-    ('33333333-0000-4000-8000-000000000003', v_company, 'V003', '精工燙金加工廠', '外包', '鄭師傅', '0933-111-222', 'net30', true,  true),
-    ('33333333-0000-4000-8000-000000000004', v_company, 'V004', '大圖輸出中心',   '外包', '高先生', '02-5555-6666', 'cash',  true,  true)
+    ('33333333-0000-4000-8000-000000000001', v_company, 'V001', '永豐紙業',       '紙材', '周先生', '02-1111-2222', 'net30', false, true),
+    ('33333333-0000-4000-8000-000000000002', v_company, 'V002', '東洋油墨行',     '油墨版材', '吳小姐', '02-3333-4444', 'cash',  false, true),
+    ('33333333-0000-4000-8000-000000000003', v_company, 'V003', '精工燙金加工廠', '後加工', '鄭師傅', '0933-111-222', 'net30', true,  true),
+    ('33333333-0000-4000-8000-000000000004', v_company, 'V004', '大圖輸出中心',   '外包印刷', '高先生', '02-5555-6666', 'cash',  true,  true)
   ON CONFLICT (id) DO NOTHING;
 
   -- ---------- 4. 訂單 ----------
@@ -50,7 +50,7 @@ BEGIN
   INSERT INTO public.orders (id, company_id, order_no, customer_id, item_name, spec, qty, unit, amount_untaxed, tax_amount, amount_total, due_date, status)
   VALUES ('44444444-0000-4000-8000-000000000002', v_company, 'SO-DEMO-002',
     '22222222-0000-4000-8000-000000000002', '開幕DM', 'A4 128P銅版 雙面 折二摺', 5000, '張',
-    12000, 600, 12600, CURRENT_DATE - 2, 'done')
+    12000, 600, 12600, CURRENT_DATE - 2, 'shipped')
   ON CONFLICT (id) DO NOTHING;
 
   -- O3 海報：剛建立，尚未開始
