@@ -43,7 +43,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
-    void logError(error?.message ?? "unknown error", { stack: error?.stack });
+    const err = error instanceof Error ? error : new Error(String(error));
+    void logError(err.message, { stack: err.stack });
   }, [error]);
 
   return (
