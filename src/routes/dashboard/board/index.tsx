@@ -71,16 +71,19 @@ const COLUMNS: ReadonlyArray<readonly [string, string]> = [
 ];
 const COLLAPSED_BY_DEFAULT = ["done", "skipped"];
 
-/** 允許的狀態轉換（前端先攔；後端 trigger 也會擋） */
+/**
+ * 允許的狀態轉換（與資料庫 trg_task_transition_check_fn 一致；後端也會擋）
+ * 「外包中」只能透過工單明細的「派外包」／外包追蹤的取消、退回進出，不提供拖拉。
+ */
 const ALLOWED: Readonly<Record<string, readonly string[]>> = {
-  pending: ["assigned", "skipped", "blocked"],
-  assigned: ["in_progress", "outsourced", "waiting_customer", "blocked", "skipped", "pending"],
-  in_progress: ["done", "blocked", "waiting_customer", "outsourced", "skipped"],
-  blocked: ["in_progress", "assigned", "waiting_customer", "skipped"],
-  waiting_customer: ["in_progress", "assigned", "blocked", "skipped"],
-  outsourced: ["in_progress", "done", "blocked", "skipped"],
+  pending: ["assigned", "in_progress", "skipped"],
+  assigned: ["in_progress", "skipped"],
+  in_progress: ["done", "blocked", "waiting_customer", "skipped"],
+  blocked: ["in_progress", "skipped"],
+  waiting_customer: ["in_progress", "skipped"],
+  outsourced: [],
   done: [],
-  skipped: ["pending", "assigned"],
+  skipped: [],
 };
 
 const EMPTY_STATIONS: string[] = [];
@@ -235,7 +238,11 @@ function Page() {
       else if (res !== null) toast.success("已完成此工序");
       return;
     }
-    // waiting_customer / outsourced / pending：直接更新狀態
+    // waiting_customer：直接更新狀態（其餘一律走 RPC）
+    if (to !== "waiting_customer") {
+      toast.error("這個狀態不能直接轉換");
+      return;
+    }
     const { data, error } = await supabase
       .from("order_tasks")
       .update({ status: to })
@@ -258,6 +265,14 @@ function Page() {
     const task = tasks.find((t) => t.id === e.active.id);
     const to = e.over?.id ? String(e.over.id) : null;
     if (!task || !to || to === task.status) return;
+    if (to === "outsourced") {
+      toast.info("外包請到工單明細按「派外包」");
+      return;
+    }
+    if (task.status === "outsourced") {
+      toast.info("外包中的工序會在對方完工後自動完成；要收回請到「外包追蹤」取消");
+      return;
+    }
     if (!ALLOWED[task.status]?.includes(to)) {
       toast.error("這個狀態不能直接轉換到目標欄位");
       return;
