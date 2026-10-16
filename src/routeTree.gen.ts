@@ -19,7 +19,10 @@ import { Route as ClockAmendmentRouteImport } from './routes/clock/amendment'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardBoardRouteImport } from './routes/dashboard/board'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard/customers'
+import { Route as DashboardDeliveriesRouteImport } from './routes/dashboard/deliveries'
 import { Route as DashboardGroupRouteImport } from './routes/dashboard/group'
+import { Route as DashboardHolidaysRouteImport } from './routes/dashboard/holidays'
+import { Route as DashboardInventoryRouteImport } from './routes/dashboard/inventory'
 import { Route as DashboardMyWorkRouteImport } from './routes/dashboard/my-work'
 import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
 import { Route as DashboardOutsourceRouteImport } from './routes/dashboard/outsource'
@@ -97,9 +100,24 @@ const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardDeliveriesRoute = DashboardDeliveriesRouteImport.update({
+  id: '/deliveries',
+  path: '/deliveries',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardGroupRoute = DashboardGroupRouteImport.update({
   id: '/group',
   path: '/group',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardHolidaysRoute = DashboardHolidaysRouteImport.update({
+  id: '/holidays',
+  path: '/holidays',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardInventoryRoute = DashboardInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardMyWorkRoute = DashboardMyWorkRouteImport.update({
@@ -250,7 +268,10 @@ export interface FileRoutesByFullPath {
   '/clock/amendment': typeof ClockAmendmentRoute
   '/dashboard/board': typeof DashboardBoardRouteWithChildren
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/deliveries': typeof DashboardDeliveriesRoute
   '/dashboard/group': typeof DashboardGroupRoute
+  '/dashboard/holidays': typeof DashboardHolidaysRoute
+  '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
@@ -286,7 +307,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/clock/amendment': typeof ClockAmendmentRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/deliveries': typeof DashboardDeliveriesRoute
   '/dashboard/group': typeof DashboardGroupRoute
+  '/dashboard/holidays': typeof DashboardHolidaysRoute
+  '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
@@ -326,7 +350,10 @@ export interface FileRoutesById {
   '/clock/amendment': typeof ClockAmendmentRoute
   '/dashboard/board': typeof DashboardBoardRouteWithChildren
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/deliveries': typeof DashboardDeliveriesRoute
   '/dashboard/group': typeof DashboardGroupRoute
+  '/dashboard/holidays': typeof DashboardHolidaysRoute
+  '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/my-work': typeof DashboardMyWorkRoute
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
@@ -367,7 +394,10 @@ export interface FileRouteTypes {
     | '/clock/amendment'
     | '/dashboard/board'
     | '/dashboard/customers'
+    | '/dashboard/deliveries'
     | '/dashboard/group'
+    | '/dashboard/holidays'
+    | '/dashboard/inventory'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
     | '/dashboard/outsource'
@@ -403,7 +433,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/clock/amendment'
     | '/dashboard/customers'
+    | '/dashboard/deliveries'
     | '/dashboard/group'
+    | '/dashboard/holidays'
+    | '/dashboard/inventory'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
     | '/dashboard/outsource'
@@ -442,7 +475,10 @@ export interface FileRouteTypes {
     | '/clock/amendment'
     | '/dashboard/board'
     | '/dashboard/customers'
+    | '/dashboard/deliveries'
     | '/dashboard/group'
+    | '/dashboard/holidays'
+    | '/dashboard/inventory'
     | '/dashboard/my-work'
     | '/dashboard/notifications'
     | '/dashboard/outsource'
@@ -553,11 +589,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCustomersRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/deliveries': {
+      id: '/dashboard/deliveries'
+      path: '/deliveries'
+      fullPath: '/dashboard/deliveries'
+      preLoaderRoute: typeof DashboardDeliveriesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/group': {
       id: '/dashboard/group'
       path: '/group'
       fullPath: '/dashboard/group'
       preLoaderRoute: typeof DashboardGroupRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/holidays': {
+      id: '/dashboard/holidays'
+      path: '/holidays'
+      fullPath: '/dashboard/holidays'
+      preLoaderRoute: typeof DashboardHolidaysRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/inventory': {
+      id: '/dashboard/inventory'
+      path: '/inventory'
+      fullPath: '/dashboard/inventory'
+      preLoaderRoute: typeof DashboardInventoryRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/my-work': {
@@ -774,7 +831,10 @@ const DashboardBoardRouteWithChildren = DashboardBoardRoute._addFileChildren(
 interface DashboardRouteChildren {
   DashboardBoardRoute: typeof DashboardBoardRouteWithChildren
   DashboardCustomersRoute: typeof DashboardCustomersRoute
+  DashboardDeliveriesRoute: typeof DashboardDeliveriesRoute
   DashboardGroupRoute: typeof DashboardGroupRoute
+  DashboardHolidaysRoute: typeof DashboardHolidaysRoute
+  DashboardInventoryRoute: typeof DashboardInventoryRoute
   DashboardMyWorkRoute: typeof DashboardMyWorkRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardOutsourceRoute: typeof DashboardOutsourceRoute
@@ -805,7 +865,10 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBoardRoute: DashboardBoardRouteWithChildren,
   DashboardCustomersRoute: DashboardCustomersRoute,
+  DashboardDeliveriesRoute: DashboardDeliveriesRoute,
   DashboardGroupRoute: DashboardGroupRoute,
+  DashboardHolidaysRoute: DashboardHolidaysRoute,
+  DashboardInventoryRoute: DashboardInventoryRoute,
   DashboardMyWorkRoute: DashboardMyWorkRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardOutsourceRoute: DashboardOutsourceRoute,
