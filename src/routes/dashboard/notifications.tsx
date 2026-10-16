@@ -33,6 +33,25 @@ const LINE_LABEL: Record<string, string> = {
   digest: "LINE 彙整",
 };
 
+
+const RULE_LABEL: Record<string, string> = {
+  task_overdue: "工序逾期",
+  order_overdue: "訂單逾期",
+  payable_due_soon: "應付到期提醒",
+  payable_overdue: "應付逾期",
+  receivable_due_soon: "應收到期提醒",
+  receivable_overdue: "應收逾期",
+  clock_in_missing: "未打上班卡",
+  abnormal_location: "異常打卡",
+  approval_pending: "補卡待審",
+  outsource_dispatched: "收到發包",
+  outsource_completed: "外包完成",
+  outsource_rejected: "外包被拒接",
+  outsource_amount_adjusted: "外包金額調整",
+  account_created: "帳號建立",
+  system_alert: "系統通知",
+};
+
 function Page() {
   const { employee, permsLoaded } = useAuth();
   const empId = employee?.id;
@@ -165,7 +184,11 @@ function Page() {
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{n.body}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {fmtDateTime(n.created_at)}
-                <span className="ml-2 font-mono">{n.rule_code}</span>
+                {RULE_LABEL[n.rule_code] && (
+                  <Badge variant="secondary" className="ml-2 text-[10px] font-normal">
+                    {RULE_LABEL[n.rule_code]}
+                  </Badge>
+                )}
               </p>
             </div>
           </button>

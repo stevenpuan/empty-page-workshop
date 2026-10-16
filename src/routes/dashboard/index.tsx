@@ -92,10 +92,7 @@ const ZERO_STATS: BoardStats = {
   done_task_count: 0,
 };
 
-
-/**
- * S1 版首頁：只放底座相關的狀態卡。S3 會換成營運總覽（逾期數、等校稿數、今日出貨）。
- */
+/** 營運總覽：工序狀態卡（看板統計）＋人員／通知／公司設定捷徑 */
 function Home() {
   const { employee, profile, company, isOwner, can, isPlatformAdmin } = useAuth();
 
@@ -223,10 +220,6 @@ function Home() {
           />
         )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        S1 底座已就位：帳號、角色權限、選單、系統參數、代碼字典、日誌、通知規則。訂單與派工看板將於
-        S2／S3 上線。
-      </p>
     </div>
   );
 }

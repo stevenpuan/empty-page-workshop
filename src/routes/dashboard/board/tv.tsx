@@ -91,6 +91,7 @@ function TvBoard() {
         .select(
           "id, status, blocked_reason, assignee_id, station_id, order_id, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
         )
+        .not("status", "in", "(done,skipped)")
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as unknown as BoardTask[];
