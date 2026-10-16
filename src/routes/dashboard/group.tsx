@@ -76,12 +76,18 @@ const PAY_STATUSES: ReadonlyArray<readonly [string, string]> = [
   ["unpaid", "未結"],
   ["partial", "部分結清"],
   ["paid", "已結清"],
+  ["unreceived", "未結"],
+  ["received", "已結清"],
+  ["void", "已作廢"],
 ];
 
 const PAY_STATUS_CLASS: Record<string, string> = {
   unpaid: "bg-red-100 text-red-800 border-red-200",
   partial: "bg-amber-100 text-amber-800 border-amber-200",
   paid: "bg-green-100 text-green-800 border-green-200",
+  unreceived: "bg-red-100 text-red-800 border-red-200",
+  received: "bg-green-100 text-green-800 border-green-200",
+  void: "bg-muted text-muted-foreground border-border",
 };
 
 function linkStatusLabel(s: string): string {
