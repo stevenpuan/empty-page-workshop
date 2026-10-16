@@ -1,5 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  handleQuickImage,
+  handleQuickPostback,
+  handleQuickText,
+  QUICK_HELP,
+  type LineMessage,
+} from "./quick.ts";
 
 /**
  * line-webhook — 接收 LINE Messaging API Webhook 事件
@@ -85,7 +92,8 @@ interface LineEvent {
   type: string;
   replyToken?: string;
   source?: { type: string; userId?: string };
-  message?: { type: string; text?: string };
+  message?: { id?: string; type: string; text?: string };
+  postback?: { data?: string };
 }
 
 async function handleEvent(event: LineEvent): Promise<unknown> {
@@ -101,15 +109,29 @@ async function handleEvent(event: LineEvent): Promise<unknown> {
           "歡迎加入！\n\n" +
           "請輸入你的【6碼綁定碼】完成帳號綁定。\n" +
           "綁定碼可在系統的「員工管理」頁面查看。\n\n" +
-          "綁定完成後，系統通知將即時推播到此。",
+          "綁定完成後，系統通知將即時推播到此，也可以用「快單」指令開單。",
       },
     ]);
     return { type: "follow", replied: true };
   }
 
+  // ── 按鈕（快單派工／開始／完成） ──
+  if (event.type === "postback" && event.postback?.data) {
+    return await handleQuickPostback(event.postback.data, lineUserId, event.replyToken!, replyMessage);
+  }
+
+  // ── 照片（附到快單） ──
+  if (event.type === "message" && event.message?.type === "image" && event.message.id) {
+    return await handleQuickImage(event.message.id, lineUserId, event.replyToken!, replyMessage);
+  }
+
   // ── message 事件 ──
   if (event.type === "message" && event.message?.type === "text") {
     const text = (event.message.text || "").trim();
+
+    // 快單指令（快單…、收款…、開始／完成／取消…）
+    const quick = await handleQuickText(text, lineUserId, event.replyToken!, replyMessage);
+    if (quick !== null) return quick;
 
     // 指令：解綁
     if (text === "解綁") {
@@ -131,7 +153,8 @@ async function handleEvent(event: LineEvent): Promise<unknown> {
             "• 輸入【6碼綁定碼】→ 綁定帳號\n" +
             "• 輸入「狀態」→ 查看綁定狀態\n" +
             "• 輸入「解綁」→ 解除LINE綁定\n" +
-            "• 輸入「幫助」→ 顯示此說明",
+            "• 輸入「幫助」→ 顯示此說明\n\n" +
+            QUICK_HELP,
         },
       ]);
       return { type: "help", replied: true };
@@ -293,7 +316,7 @@ async function handleStatus(
 
 async function replyMessage(
   replyToken: string,
-  messages: Array<{ type: string; text: string }>
+  messages: LineMessage[]
 ): Promise<void> {
   const res = await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",

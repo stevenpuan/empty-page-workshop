@@ -78,7 +78,7 @@ export const AR: LedgerConfig = {
   actualLabel: "實收金額",
   prepayLabel: "預收",
   allocTable: "collection_allocations",
-  source: { delivery: "出貨", outsource: "外包", manual: "手動" },
+  source: { delivery: "出貨", outsource: "外包", manual: "手動", quick: "快單" },
   rpc: {
     create: "allocate_collection",
     apply: "apply_collection",

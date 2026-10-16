@@ -124,6 +124,10 @@ type GroupKpi = {
   active_employees: number | null;
   today_clock_in: number | null;
   today_abnormal: number | null;
+  today_quick_jobs: number | null;
+  quick_open: number | null;
+  today_quick_amount: number | string | null;
+  month_quick_amount: number | string | null;
 };
 
 /** group_kpis 只開放老闆；其他角色呼叫會被 DB 擋下（權限錯誤） */
@@ -199,6 +203,12 @@ function CompanyKpiCard({ k }: { k: GroupKpi }) {
           value={num(k.today_abnormal)}
           alert={(k.today_abnormal ?? 0) > 0}
         />
+        <KpiItem
+          label="快單 今日開單／未結案"
+          value={`${num(k.today_quick_jobs)} / ${num(k.quick_open)}`}
+        />
+        <KpiItem label="快單 今日營收" value={formatTWD(k.today_quick_amount)} />
+        <KpiItem label="快單 本月營收" value={formatTWD(k.month_quick_amount)} />
       </CardContent>
     </Card>
   );

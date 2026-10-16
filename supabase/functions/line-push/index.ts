@@ -65,10 +65,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const text = title ? `【${title}】\n${messageBody ?? ""}` : String(messageBody ?? "");
+    // deno-lint-ignore no-explicit-any
+    const message: Record<string, any> = { type: "text", text: text.slice(0, 4900) };
+    if (ids.length === 1) {
+      const quickReply = await quickJobButtons(ids[0]);
+      if (quickReply) message.quickReply = quickReply;
+    }
     const lineRes = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ to: line_user_id, messages: [{ type: "text", text: text.slice(0, 4900) }] }),
+      body: JSON.stringify({ to: line_user_id, messages: [message] }),
     });
 
     if (lineRes.ok) {
@@ -94,4 +100,70 @@ async function updateLineStatus(ids: string[], status: string, error: string | n
   if (error) update.line_error = error;
   const { error: dbErr } = await admin.from("notifications").update(update).in("id", ids);
   if (dbErr) console.error("updateLineStatus error:", dbErr.message);
+}
+
+/**
+ * 快單通知附上按鈕：待派工 → 員工名字（派工）；派給你 → 開始做／做好了；待取件 → 取件收款
+ */
+async function quickJobButtons(notificationId: string) {
+  const { data: n } = await admin
+    .from("notifications")
+    .select("rule_code, ref_type, ref_id")
+    .eq("id", notificationId)
+    .maybeSingle();
+  if (!n || n.ref_type !== "quick_job" || !n.ref_id) return null;
+  const { data: job } = await admin
+    .from("quick_jobs")
+    .select("id, job_no, company_id, status")
+    .eq("id", n.ref_id)
+    .maybeSingle();
+  if (!job) return null;
+  const short = String(job.job_no).slice(-7);
+
+  if (n.rule_code === "quick_job_new" && job.status === "new") {
+    const { data: staff } = await admin
+      .from("employees")
+      .select("id, name, emp_no")
+      .eq("company_id", job.company_id)
+      .eq("is_active", true)
+      .order("emp_no")
+      .limit(13);
+    if (!staff?.length) return null;
+    return {
+      items: staff.map((e: { id: string; name: string }) => ({
+        type: "action",
+        action: {
+          type: "postback",
+          label: e.name.slice(0, 20),
+          data: `qj:assign:${job.id}:${e.id}`,
+          displayText: `派給 ${e.name}`,
+        },
+      })),
+    };
+  }
+  if (n.rule_code === "quick_job_assigned" && ["assigned", "in_progress"].includes(job.status)) {
+    return {
+      items: [
+        { type: "action", action: { type: "postback", label: "開始做", data: `qj:start:${job.id}`, displayText: `開始 ${short}` } },
+        { type: "action", action: { type: "postback", label: "做好了", data: `qj:done:${job.id}`, displayText: `完成 ${short}` } },
+      ],
+    };
+  }
+  if (n.rule_code === "quick_job_ready" && job.status === "ready") {
+    return {
+      items: [
+        {
+          type: "action",
+          action: {
+            type: "postback",
+            label: "取件收款",
+            data: "qj:noop",
+            inputOption: "openKeyboard",
+            fillInText: `收款 ${short} `,
+          },
+        },
+      ],
+    };
+  }
+  return null;
 }
