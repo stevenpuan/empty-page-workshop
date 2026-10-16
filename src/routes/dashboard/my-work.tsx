@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ export const Route = createFileRoute("/dashboard/my-work")({
 interface MyTask {
   id: string;
   status: string;
+  order_id: string | null;
   blocked_reason: string | null;
   step_no: number | null;
   orders: { order_no: string; item_name: string | null; due_date: string | null } | null;
@@ -71,6 +72,23 @@ const STATUS_ORDER = [
   "skipped",
 ];
 
+/** 出貨站代碼：只剩這些站沒完成時，即可開立出貨單（開立時自動完成出貨站） */
+const SHIP_STATION_CODES = ["SHIP", "QCSHIP"];
+type TaskDoneResult = { order_all_done?: boolean; order_id?: string; order_no?: string };
+
+/** 該訂單未完成的工序是否只剩出貨站 */
+async function onlyShippingLeft(orderId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("order_tasks")
+    .select("id, work_stations:station_id(code)")
+    .eq("order_id", orderId)
+    .not("status", "in", "(done,skipped)");
+  if (error || !data?.length) return false;
+  return (data as unknown as { work_stations: { code: string | null } | null }[]).every((t) =>
+    SHIP_STATION_CODES.includes(t.work_stations?.code ?? ""),
+  );
+}
+
 function statusTone(status: string) {
   switch (status) {
     case "in_progress":
@@ -90,6 +108,7 @@ function statusTone(status: string) {
 
 function Page() {
   const { employee } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   useBoardRealtime();
 
@@ -111,7 +130,7 @@ function Page() {
       const { data, error } = await supabase
         .from("order_tasks")
         .select(
-          "id, status, blocked_reason, step_no, orders:order_id(order_no, item_name, due_date), work_stations:station_id(name, color)",
+          "id, status, order_id, blocked_reason, step_no, orders:order_id(order_no, item_name, due_date), work_stations:station_id(name, color)",
         )
         .eq("assignee_id", employee!.id);
       if (error) throw error;
@@ -155,15 +174,31 @@ function Page() {
   };
 
   const done = async (t: MyTask) => {
-    const res = (await runRpc("task_done", { p_task_id: t.id }, "完成工序")) as
-      | { order_all_done?: boolean }
+    const raw = (await runRpc("task_done", { p_task_id: t.id }, "完成工序")) as
+      | TaskDoneResult
+      | TaskDoneResult[]
       | null;
-    if (res === null) return;
-    const allDone = Array.isArray(res)
-      ? (res[0] as { order_all_done?: boolean } | undefined)?.order_all_done
-      : res?.order_all_done;
-    if (allDone) toast.success(`訂單 ${t.orders?.order_no ?? ""} 全部工序完成！`);
-    else toast.success("已完成此工序");
+    if (raw === null) return;
+    const res = (Array.isArray(raw) ? raw[0] : raw) ?? null;
+    const orderId = res?.order_id ?? t.order_id;
+    const orderNo = res?.order_no ?? t.orders?.order_no ?? "";
+    const goDeliver = orderId
+      ? {
+          label: "開立出貨單",
+          onClick: () =>
+            void navigate({ to: "/dashboard/orders/$orderId", params: { orderId } }),
+        }
+      : undefined;
+    if (res?.order_all_done) {
+      toast.success(`訂單 ${orderNo} 全部工序完成！`, { action: goDeliver, duration: 10000 });
+    } else if (orderId && (await onlyShippingLeft(orderId))) {
+      toast.success(`訂單 ${orderNo} 只剩出貨站，可開立出貨單`, {
+        action: goDeliver,
+        duration: 10000,
+      });
+    } else {
+      toast.success("已完成此工序");
+    }
   };
 
   const confirmBlock = async () => {

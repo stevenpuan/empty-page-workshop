@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -71,6 +71,23 @@ const COLUMNS: ReadonlyArray<readonly [string, string]> = [
 ];
 const COLLAPSED_BY_DEFAULT = ["done", "skipped"];
 
+/** 出貨站代碼：只剩這些站沒完成時，即可開立出貨單（開立時自動完成出貨站） */
+const SHIP_STATION_CODES = ["SHIP", "QCSHIP"];
+type TaskDoneResult = { order_all_done?: boolean; order_id?: string; order_no?: string };
+
+/** 該訂單未完成的工序是否只剩出貨站 */
+async function onlyShippingLeft(orderId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("order_tasks")
+    .select("id, work_stations:station_id(code)")
+    .eq("order_id", orderId)
+    .not("status", "in", "(done,skipped)");
+  if (error || !data?.length) return false;
+  return (data as unknown as { work_stations: { code: string | null } | null }[]).every((t) =>
+    SHIP_STATION_CODES.includes(t.work_stations?.code ?? ""),
+  );
+}
+
 /**
  * 允許的狀態轉換（與資料庫 trg_task_transition_check_fn 一致；後端也會擋）
  * 「外包中」只能透過工單明細的「派外包」／外包追蹤的取消、退回進出，不提供拖拉。
@@ -101,6 +118,7 @@ interface Station {
 
 function Page() {
   const { company, isManager } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const canDrag = isManager;
   useBoardRealtime();
@@ -228,14 +246,31 @@ function Page() {
       return;
     }
     if (to === "done") {
-      const res = (await runRpc("task_done", { p_task_id: task.id }, "完成工序")) as
-        | { order_all_done?: boolean }
+      const raw = (await runRpc("task_done", { p_task_id: task.id }, "完成工序")) as
+        | TaskDoneResult
+        | TaskDoneResult[]
         | null;
-      const allDone = Array.isArray(res)
-        ? (res[0] as { order_all_done?: boolean } | undefined)?.order_all_done
-        : res?.order_all_done;
-      if (allDone) toast.success(`訂單 ${task.orders?.order_no ?? ""} 全部工序完成！`);
-      else if (res !== null) toast.success("已完成此工序");
+      if (raw === null) return;
+      const res = (Array.isArray(raw) ? raw[0] : raw) ?? null;
+      const orderId = res?.order_id ?? task.order_id;
+      const orderNo = res?.order_no ?? task.orders?.order_no ?? "";
+      const goDeliver = orderId
+        ? {
+            label: "開立出貨單",
+            onClick: () =>
+              void navigate({ to: "/dashboard/orders/$orderId", params: { orderId } }),
+          }
+        : undefined;
+      if (res?.order_all_done) {
+        toast.success(`訂單 ${orderNo} 全部工序完成！`, { action: goDeliver, duration: 10000 });
+      } else if (orderId && (await onlyShippingLeft(orderId))) {
+        toast.success(`訂單 ${orderNo} 只剩出貨站，可開立出貨單`, {
+          action: goDeliver,
+          duration: 10000,
+        });
+      } else {
+        toast.success("已完成此工序");
+      }
       return;
     }
     // waiting_customer：直接更新狀態（其餘一律走 RPC）

@@ -1,13 +1,72 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Users, Bell, KeyRound, Building2 } from "lucide-react";
+import { Users, Bell, KeyRound, Building2, ClipboardList, KanbanSquare, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
+import { RequirePerm } from "@/components/RequirePerm";
 
-export const Route = createFileRoute("/dashboard/")({ component: Home });
+export const Route = createFileRoute("/dashboard/")({ component: HomeGate });
+
+/**
+ * /dashboard 是登入後的預設落點。現場人員（staff）預設沒有 dashboard 模組權限，
+ * 若直接顯示「沒有權限」（其「回首頁」又指回本頁）會卡住，所以沒有 dashboard 權限時改顯示
+ * 個人捷徑頁；有權限才進營運總覽（仍由 RequirePerm 把關模組啟用與權限）。
+ */
+function HomeGate() {
+  const { permsLoaded, can } = useAuth();
+  if (!permsLoaded) return <div className="text-muted-foreground py-8">載入中…</div>;
+  if (!can("dashboard", "view")) return <Landing />;
+  return (
+    <RequirePerm module="dashboard">
+      <Home />
+    </RequirePerm>
+  );
+}
+
+function Landing() {
+  const { employee, profile, company, can } = useAuth();
+  const name = employee?.name ?? profile?.display_name ?? "";
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={`歡迎回來，${name}`}
+        description={`${company?.name ?? ""} · 角色：${employee?.role?.name ?? "—"}`}
+      />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {can("my_work", "view") && (
+          <StatCard
+            icon={<ClipboardList className="w-5 h-5" />}
+            label="我的工作"
+            value="查看"
+            to="/dashboard/my-work"
+          />
+        )}
+        {can("board", "view") && (
+          <StatCard
+            icon={<KanbanSquare className="w-5 h-5" />}
+            label="派工看板"
+            value="查看"
+            to="/dashboard/board"
+          />
+        )}
+        {employee && (
+          <StatCard icon={<Clock className="w-5 h-5" />} label="打卡" value="前往" to="/clock" />
+        )}
+        {employee && (
+          <StatCard
+            icon={<Bell className="w-5 h-5" />}
+            label="通知中心"
+            value="查看"
+            to="/dashboard/notifications"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface BoardStats {
   in_progress_count: number;

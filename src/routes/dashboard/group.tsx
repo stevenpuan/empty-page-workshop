@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { AlertTriangle, Building2, CheckCircle } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, Building2, CheckCircle, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
 import { formatTWD } from "@/lib/dates";
 import { RequirePerm } from "@/components/RequirePerm";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableHeader,
@@ -102,6 +102,156 @@ function PayBadge({ status }: { status: string | null }) {
   );
 }
 
+type GroupKpi = {
+  company_id: string;
+  company_code: string;
+  company_name: string;
+  today_new_orders: number | null;
+  month_orders: number | null;
+  month_order_amount: number | string | null;
+  wip_orders: number | null;
+  overdue_tasks: number | null;
+  outsourcing: number | null;
+  month_shipped_amount: number | string | null;
+  ar_balance: number | string | null;
+  ap_balance: number | string | null;
+  active_employees: number | null;
+  today_clock_in: number | null;
+  today_abnormal: number | null;
+};
+
+/** group_kpis 只開放老闆；其他角色呼叫會被 DB 擋下（權限錯誤） */
+function isOwnerOnlyError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  const msg = (e?.message ?? "").toLowerCase();
+  return (
+    e?.code === "42501" ||
+    msg.includes("permission") ||
+    msg.includes("owner") ||
+    msg.includes("not allowed") ||
+    msg.includes("forbidden") ||
+    (e?.message ?? "").includes("老闆") ||
+    (e?.message ?? "").includes("權限")
+  );
+}
+
+const num = (v: number | null | undefined) => (v == null ? "—" : String(v));
+
+function KpiItem({
+  label,
+  value,
+  alert,
+}: {
+  label: string;
+  value: ReactNode;
+  alert?: boolean;
+}) {
+  return (
+    <div className="rounded-md border px-3 py-2">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div
+        className={`mt-0.5 text-lg font-semibold tabular-nums ${alert ? "text-destructive" : ""}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function CompanyKpiCard({ k }: { k: GroupKpi }) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Building2 className="h-4 w-4 text-muted-foreground" />
+          {k.company_name}
+          <Badge variant="outline" className="font-mono text-xs">
+            {k.company_code}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <KpiItem label="今日新單" value={num(k.today_new_orders)} />
+        <KpiItem label="本月接單數" value={`${num(k.month_orders)} 張`} />
+        <KpiItem label="本月接單金額" value={formatTWD(k.month_order_amount)} />
+        <KpiItem label="進行中工單" value={num(k.wip_orders)} />
+        <KpiItem
+          label="逾期工序"
+          value={num(k.overdue_tasks)}
+          alert={(k.overdue_tasks ?? 0) > 0}
+        />
+        <KpiItem label="外包中" value={num(k.outsourcing)} />
+        <KpiItem label="本月出貨金額" value={formatTWD(k.month_shipped_amount)} />
+        <KpiItem label="應收未收" value={formatTWD(k.ar_balance)} />
+        <KpiItem label="應付未付" value={formatTWD(k.ap_balance)} />
+        <KpiItem
+          label="今日到勤／在職"
+          value={`${num(k.today_clock_in)} / ${num(k.active_employees)}`}
+        />
+        <KpiItem
+          label="今日異常打卡"
+          value={num(k.today_abnormal)}
+          alert={(k.today_abnormal ?? 0) > 0}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function GroupKpiSection() {
+  const { company } = useAuth();
+  const kpiQuery = useQuery({
+    queryKey: ["group_kpis", company?.id],
+    enabled: !!company?.id,
+    retry: false,
+    queryFn: async (): Promise<GroupKpi[]> => {
+      const { data, error } = await supabase.rpc("group_kpis");
+      if (error) throw error;
+      return ((data ?? []) as GroupKpi[])
+        .slice()
+        .sort((a, b) => a.company_code.localeCompare(b.company_code));
+    },
+  });
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">兩家今日／本月</h2>
+      {kpiQuery.isLoading ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">載入中…</CardContent>
+        </Card>
+      ) : kpiQuery.error ? (
+        isOwnerOnlyError(kpiQuery.error) ? (
+          <Card>
+            <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Lock className="h-4 w-4" />
+              兩家公司的營運指標僅限老闆檢視。
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="py-6 text-sm text-destructive">
+              {humanizeError(kpiQuery.error, "載入兩家營運指標")}
+            </CardContent>
+          </Card>
+        )
+      ) : (kpiQuery.data ?? []).length === 0 ? (
+        <Card>
+          <CardContent className="py-6 text-center text-sm text-muted-foreground">
+            沒有可檢視的公司資料
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(kpiQuery.data ?? []).map((k) => (
+            <CompanyKpiCard key={k.company_id} k={k} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Page() {
   const { company } = useAuth();
   const companyId = company?.id ?? null;
@@ -164,8 +314,9 @@ function Page() {
 
   if (reconQuery.error) {
     return (
-      <div className="p-6">
+      <div className="p-6 space-y-6">
         <PageHeader title="集團總覽" description="跨公司往來對帳" />
+        <GroupKpiSection />
         <Card>
           <CardContent className="py-10 text-center text-destructive">
             無法讀取集團對帳資料：
@@ -181,8 +332,12 @@ function Page() {
     <div className="p-6 space-y-6">
       <PageHeader
         title="集團總覽"
-        description="跨公司往來對帳，掌握集團內外包金額與結清狀態"
+        description="兩家公司今日／本月營運指標，以及跨公司往來對帳"
       />
+
+      <GroupKpiSection />
+
+      <h2 className="text-lg font-semibold">跨公司往來對帳</h2>
 
       {/* 摘要卡片 */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
