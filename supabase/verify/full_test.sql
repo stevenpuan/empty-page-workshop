@@ -1,11 +1,6 @@
--- =====================================================================
--- full_test.sql — 後端完整測試（越權矩陣 A1–A8＋S2–S8 流程＋資安回歸）
--- 在單一交易內建立 6 個測試帳號與測試資料，逐項以各角色身分呼叫，最後 ROLLBACK，
--- 不會在資料庫留下任何資料。用法：Supabase SQL Editor 整份貼上執行，看最後的結果表。
--- 前提：祥興 3 個站別、祥興廠商「沂融企業社」已綁定、沂融「外包通用工序」範本存在
---       （測試會自建祥興測試範本）。主檔 id 為 2026-10 的實際值，主檔改動後需同步調整。
--- 2026-10-16 結果：59/59 通過
--- =====================================================================
+-- 祥興／沂融 完整回歸測試（含 019–021 新功能）
+-- 在單一交易內建立 6 個測試帳號與資料，以各角色身分呼叫資料庫，最後 ROLLBACK，不留任何資料。
+-- 用法：Supabase SQL Editor 整段貼上執行。2026-10-16 結果：94/94 通過。
 begin;
 create temp table _t(n serial, grp text, test text, expect text, actual text, pass boolean) on commit drop;
 grant all on _t to authenticated, anon;
@@ -20,7 +15,6 @@ declare
   u record;
   v_tpl uuid;
 begin
-  -- 測試帳號：O=老闆(兩家)、XM=祥興主管、XS/XS2=祥興員工、YM=沂融主管、YS=沂融員工
   for u in select * from (values
     ('O',  'aaaaaaaa-0000-4000-8000-000000000001'::uuid),
     ('XM', 'aaaaaaaa-0000-4000-8000-000000000002'::uuid),
@@ -56,7 +50,6 @@ begin
   insert into _v select 'emp_' || e.emp_no || '_' || c.code, e.id::text
     from employees e join companies c on c.id = e.company_id where e.emp_no like 'T%';
 
-  -- 祥興測試範本：印前(交期前3天) → 印刷(前2天) → 後加工(前1天)
   insert into routing_templates(company_id, product_category, name, is_default, is_active)
   values (XX, '名片', 'TEST 名片', false, true) returning id into v_tpl;
   insert into routing_template_steps(company_id, template_id, station_id, step_no, offset_days, is_optional) values
@@ -88,7 +81,6 @@ begin
   select v::uuid into eXS from _v where k='emp_TXS_XX'; select v::uuid into eXS2 from _v where k='emp_TXS2_XX';
   select v::uuid into eXM from _v where k='emp_TXM_XX'; select v::uuid into v_tpl from _v where k='tpl';
 
-  ---------------------------------------------------------------- S2 訂單
   perform set_config('request.jwt.claims', json_build_object('sub', uXM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   insert into orders(company_id, customer_id, item_name, qty, unit, amount_total, due_date, status, routing_template_id)
@@ -111,7 +103,6 @@ begin
   select id into t3 from order_tasks where order_id = o1 and step_no = 3;
   select id into t2b from order_tasks where order_id = o2 and step_no = 3;
 
-  ---------------------------------------------------------------- S3 看板／派工
   perform public.task_assign(t1, eXS);
   select status into v_txt from order_tasks where id = t1;
   insert into _t(grp,test,expect,actual,pass) values ('S3','主管指派工序','assigned', v_txt, v_txt = 'assigned');
@@ -163,7 +154,6 @@ begin
   end;
   select count(*) into v_n from public.get_line_bind_status();
   insert into _t(grp,test,expect,actual,pass) values ('S8','員工查綁定狀態只看到自己','1 筆', v_n||' 筆', v_n = 1);
-  ---------------------------------------------------------------- S6 打卡
   v_res := public.clock_in(24.0, 120.5);
   insert into _t(grp,test,expect,actual,pass) values ('S6','店內打卡','正常、距離 0m', (v_res->>'distance_m')||'m 異常='||(v_res->>'is_abnormal'), (v_res->>'is_abnormal')::boolean = false);
   v_res := public.clock_out(24.0, 120.5);
@@ -190,9 +180,9 @@ begin
   select count(*) into v_n from notifications where rule_code = 'abnormal_location' and created_at > now() - interval '1 minute';
   insert into _t(grp,test,expect,actual,pass) values ('S6','異地打卡通知主管','有通知', v_n||' 則', v_n > 0);
 
-  ---------------------------------------------------------------- S4 外包（祥興主管）
   perform set_config('request.jwt.claims', json_build_object('sub', uXM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
+  select status into v_txt from attendance_amendments where reason = 'TEST 忘記打卡';
   select id into v_pay from attendance_amendments where reason = 'TEST 忘記打卡';
   perform public.approve_amendment(v_pay, true, 'ok');
   select status into v_txt from attendance_amendments where id = v_pay;
@@ -200,7 +190,6 @@ begin
   select count(*) into v_n from attendances;
   insert into _t(grp,test,expect,actual,pass) values ('S6','主管看得到全公司出勤','≥ 2 筆', v_n||' 筆', v_n >= 2);
 
-  -- C3 必須在本交易任何外包 RPC 之前測（外包 RPC 會在交易內設定旗標）
   begin
     update order_tasks set status = 'outsourced' where id = t2;
     insert into _t(grp,test,expect,actual,pass) values ('C3','直接把工序改成外包中（繞過派外包）','擋下','未擋', false);
@@ -221,7 +210,6 @@ begin
   execute 'set local role authenticated';
   select status into v_txt from order_tasks where id = t3;
   insert into _t(grp,test,expect,actual,pass) values ('S4','祥興端工序轉外包中','outsourced', v_txt, v_txt = 'outsourced');
-  -- 第二張：之後讓沂融拒接
   v_res := public.dispatch_outsource(t2b, V_YR, 600, current_date + 4, 'TEST 外包2');
   v_link2 := (v_res->>'link_id')::uuid;
   begin
@@ -232,7 +220,6 @@ begin
   end;
   execute 'reset role';
 
-  -- 沂融員工視角（A1/A2/U6）
   perform set_config('request.jwt.claims', json_build_object('sub', uYS, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into v_n from orders where id = o1;
@@ -253,7 +240,6 @@ begin
   end;
   execute 'reset role';
 
-  -- 沂融主管：拒接第二張、完成第一張
   perform set_config('request.jwt.claims', json_build_object('sub', uYM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   perform public.reject_outsource(v_link2, 'TEST 產能不足');
@@ -278,7 +264,6 @@ begin
   select count(*) into v_n from cross_company_events where link_id in (v_link, v_link2);
   insert into _t(grp,test,expect,actual,pass) values ('S4','跨公司事件完整記錄','≥ 4 筆', v_n||' 筆', v_n >= 4);
 
-  -- 老闆：集團對帳、A8 切公司
   perform set_config('request.jwt.claims', json_build_object('sub', uO, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*), bool_or(amount_mismatch) into v_n, v_ok from group_reconciliation where link_id = v_link;
@@ -294,12 +279,14 @@ begin
   insert into _t(grp,test,expect,actual,pass) values ('S4','非老闆看集團對帳','0 筆', v_txt||' 筆', v_txt = '0');
   execute 'reset role';
 
-  ---------------------------------------------------------------- S5 採購／應付（祥興主管）
   perform set_config('request.jwt.claims', json_build_object('sub', uXM, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   select count(*) into v_n from order_costs where order_id = o1;
   insert into purchases(company_id, purchase_no, vendor_id, purchase_date, source_type, related_order_id, amount_untaxed, tax_amount, amount_total, status)
   values (XX, 'TEST-PO-1', V_NET30, current_date, 'direct', o1, 952, 48, 1000, 'draft') returning id into p1;
+  insert into purchase_items(company_id, purchase_id, item_name, qty, unit, unit_price) values (XX, p1, 'TEST 紙', 1, '令', 952);
+  select amount_total into v_n2 from purchases where id = p1;
+  insert into _t(grp,test,expect,actual,pass) values ('N','進貨金額由明細計算（952＋5%）','1000', v_n2::text, v_n2 = 1000);
   perform public.confirm_purchase(p1);
   select due_date into v_due from payables where purchase_id = p1;
   insert into _t(grp,test,expect,actual,pass) values ('S5','進貨確認產生應付、net30 到期日', (current_date+30)::text, coalesce(v_due::text,'(沒產生)'), v_due = current_date + 30);
@@ -307,6 +294,7 @@ begin
   insert into _t(grp,test,expect,actual,pass) values ('S5','direct 進貨掛到工單成本','+1 筆', (v_n2 - v_n)||' 筆', v_n2 - v_n = 1);
   insert into purchases(company_id, purchase_no, vendor_id, purchase_date, source_type, amount_untaxed, tax_amount, amount_total, status)
   values (XX, 'TEST-PO-2', V_CASH, current_date, 'stock', 476, 24, 500, 'draft') returning id into p2;
+  insert into purchase_items(company_id, purchase_id, item_name, spec, qty, unit, unit_price) values (XX, p2, 'TEST 銅版紙', 'A4 150g', 10, '包', 47.6);
   select count(*) into v_n from order_costs;
   perform public.confirm_purchase(p2);
   select count(*) into v_n2 from order_costs;
@@ -348,13 +336,11 @@ begin
     (public.calc_due_date('monthly_end', date '2026-10-16') = date '2026-11-30')) t(ok);
   insert into _t(grp,test,expect,actual,pass) values ('S5','六種付款條件到期日推算','全對', case when v_ok then '全對' else '有誤' end, v_ok);
 
-  ---------------------------------------------------------------- S7 通知掃描
   update order_tasks set due_at = current_date - 2 where id = t2;
   v_n := public.notify_scan_all();
   select count(*) into v_n2 from notifications where rule_code = 'task_overdue' and ref_id = t2;
   insert into _t(grp,test,expect,actual,pass) values ('S7','逾期工序掃描產生通知','有通知', v_n2||' 則', v_n2 > 0);
 
-  ---------------------------------------------------------------- S8 LINE 綁定（webhook 走 service_role）
   select line_bind_code into v_code from employees where id = eXS;
   select line_bind_code into v_code2 from employees where id = eXS2;
   v_res := to_jsonb(public.bind_line_account(v_code, 'U_TEST_ONLY_0001'));
@@ -364,7 +350,211 @@ begin
   select line_user_id is null into v_ok from employees where id = eXS2;
   insert into _t(grp,test,expect,actual,pass) values ('S8','同一個 LINE 綁第二位員工','拒絕', case when v_ok then '拒絕' else '被綁上' end, v_ok);
 
-  ---------------------------------------------------------------- 未登入（anon）
+  -- ================= 019/020 新功能 =================
+  declare
+    P_CARD uuid := '66666666-0000-4000-8000-000000000001';  -- 祥興產品「名片」
+    o3 uuid; o4 uuid; v_dn uuid; q1 uuid; v_inv uuid; v_num numeric; v_num2 numeric; tk record;
+  begin
+    -- 前面外包 RPC 設的 app.task_rpc 旗標在同一交易內會延續，正式環境每個請求各自一個交易，這裡手動清掉
+    perform set_config('app.task_rpc', '', true);
+    perform set_config('request.jwt.claims', json_build_object('sub', uXM, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+
+    -- 訂單：產品預設範本自動展開 8 道、金額由 DB 計算
+    insert into orders(company_id, customer_id, product_id, item_name, qty, unit, amount_untaxed, tax_amount, due_date, status)
+    values (XX, CUST, P_CARD, 'TEST 新流程名片', 5, '盒', 1000, null, current_date + 10, 'active') returning id into o3;
+    select count(*) into v_n from order_tasks where order_id = o3;
+    insert into _t(grp,test,expect,actual,pass) values ('N','訂單未選範本→依產品預設範本展開','8 道', v_n||' 道', v_n = 8);
+    select amount_total into v_num from orders where id = o3;
+    insert into _t(grp,test,expect,actual,pass) values ('N','訂單含稅金額由 DB 計算（1000＋5%）','1050', v_num::text, v_num = 1050);
+
+    begin
+      update orders set status = 'void' where id = o3;
+      insert into _t(grp,test,expect,actual,pass) values ('N','前端直接改訂單狀態','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','前端直接改訂單狀態','擋下','擋下', true);
+    end;
+    insert into orders(company_id, customer_id, product_id, item_name, qty, amount_untaxed, tax_amount, due_date, status)
+    values (XX, CUST, P_CARD, 'TEST 草稿', 1, 500, 25, current_date + 7, 'draft') returning id into o4;
+    perform public.set_order_status(o4, 'active');
+    select count(*) into v_n from order_tasks where order_id = o4;
+    insert into _t(grp,test,expect,actual,pass) values ('N','set_order_status 草稿→確認並展開工序','active／8 道',
+      (select status from orders where id = o4)||'／'||v_n||' 道', v_n = 8);
+    begin
+      perform public.set_order_status(o4, 'closed');
+      insert into _t(grp,test,expect,actual,pass) values ('N','不合法狀態轉換 active→closed','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','不合法狀態轉換 active→closed','擋下','擋下', true);
+    end;
+
+    -- 出貨單
+    begin
+      perform public.create_delivery_note(o3, null, null, null, null);
+      insert into _t(grp,test,expect,actual,pass) values ('N','工序未完成就開出貨單','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','工序未完成就開出貨單','擋下','擋下', true);
+    end;
+    for tk in select t.id from order_tasks t join work_stations w on w.id = t.station_id
+               where t.order_id = o3 and w.code <> 'SHIP' order by t.step_no loop
+      perform public.task_start(tk.id);
+      perform public.task_done(tk.id);
+    end loop;
+    v_res := public.create_delivery_note(o3, current_date, '王小姐', null, 'TEST');
+    v_dn := (v_res->>'delivery_id')::uuid;
+    select status into v_txt from orders where id = o3;
+    insert into _t(grp,test,expect,actual,pass) values ('N','開出貨單→訂單轉已出貨', 'shipped', v_txt, v_txt = 'shipped');
+    select amount, due_date into v_num, v_due from receivables where id = (v_res->>'receivable_id')::uuid;
+    insert into _t(grp,test,expect,actual,pass) values ('N','出貨產生應收（金額、客戶 net30 到期）', '1050／'||(current_date+30),
+      coalesce(v_num::text,'無')||'／'||coalesce(v_due::text,'無'), v_num = 1050 and v_due = current_date + 30);
+    select t.status into v_txt from order_tasks t join work_stations w on w.id = t.station_id where t.order_id = o3 and w.code = 'SHIP';
+    insert into _t(grp,test,expect,actual,pass) values ('N','出貨站工序自動完成','done', v_txt, v_txt = 'done');
+    begin
+      perform public.create_delivery_note(o3, null, null, null, null);
+      insert into _t(grp,test,expect,actual,pass) values ('N','同一訂單重複開出貨單','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','同一訂單重複開出貨單','擋下','擋下', true);
+    end;
+    begin
+      insert into delivery_notes(company_id, delivery_no, order_id) values (XX, 'HACK', o3);
+      insert into _t(grp,test,expect,actual,pass) values ('N','前端直接寫出貨單表','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','前端直接寫出貨單表','擋下','擋下', true);
+    end;
+    execute 'reset role';
+
+    perform set_config('request.jwt.claims', json_build_object('sub', uXS, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      perform public.void_delivery_note(v_dn, 'x');
+      insert into _t(grp,test,expect,actual,pass) values ('N','員工作廢出貨單','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','員工作廢出貨單','擋下','擋下', true);
+    end;
+    select count(*) into v_n from delivery_notes;
+    insert into _t(grp,test,expect,actual,pass) values ('N','員工（無訂單權限）看出貨單','0 筆', v_n||' 筆', v_n = 0);
+    begin
+      perform public.inventory_issue((select id from inventory_items where company_id = XX and name = 'TEST 銅版紙'), 1, null, null);
+      insert into _t(grp,test,expect,actual,pass) values ('N','員工領料（無庫存權限）','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','員工領料（無庫存權限）','擋下','擋下', true);
+    end;
+    begin
+      insert into holidays(company_id, holiday_date, name) values (XX, date '2027-08-08', 'HACK');
+      insert into _t(grp,test,expect,actual,pass) values ('N','員工新增假日','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','員工新增假日','擋下','擋下', true);
+    end;
+    begin
+      perform public.next_doc_no(YR, 'WO');
+      insert into _t(grp,test,expect,actual,pass) values ('N','替別家公司取單號','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','替別家公司取單號','擋下','擋下', true);
+    end;
+    execute 'reset role';
+
+    perform set_config('request.jwt.claims', json_build_object('sub', uXM, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    perform public.void_delivery_note(v_dn, 'TEST 作廢');
+    select o.status || '／' || rv.status into v_txt from orders o, receivables rv
+     where o.id = o3 and rv.id = (v_res->>'receivable_id')::uuid;
+    insert into _t(grp,test,expect,actual,pass) values ('N','主管作廢出貨單→訂單回進行中、應收作廢','active／void', v_txt, v_txt = 'active／void');
+
+    -- 報價單金額由 DB 計算
+    insert into quotations(company_id, quote_no, customer_id, tax_type, subtotal, total)
+    values (XX, 'TEST-Q-1', CUST, 'taxable', 99999, 99999) returning id into q1;
+    insert into quotation_items(quotation_id, item_name, qty, unit_price, amount) values
+      (q1, 'A', 2, 150, 0), (q1, 'B', 1, 700, 0);
+    select subtotal::text||'/'||tax_amount||'/'||total into v_txt from quotations where id = q1;
+    insert into _t(grp,test,expect,actual,pass) values ('N','報價小計／稅額／合計由明細計算','1000/50/1050', v_txt, v_txt = '1000/50/1050');
+
+    -- 進貨確認後明細鎖定
+    begin
+      update purchase_items set unit_price = 1 where purchase_id = p1;
+      insert into _t(grp,test,expect,actual,pass) values ('N','已確認進貨單改明細','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','已確認進貨單改明細','擋下','擋下', true);
+    end;
+
+    -- 庫存：stock 進貨入庫、領料掛成本、盤點
+    select id, qty_on_hand, avg_cost into v_inv, v_num, v_num2 from inventory_items where company_id = XX and name = 'TEST 銅版紙';
+    insert into _t(grp,test,expect,actual,pass) values ('N','stock 進貨確認後入庫','10 包 @47.6',
+      coalesce(v_num::text,'無')||' 包 @'||coalesce(v_num2::text,'-'), v_num = 10 and v_num2 = 47.6);
+    select count(*) into v_n from order_costs where order_id = o1;
+    perform public.inventory_issue(v_inv, 3, o1, 'TEST 領料');
+    select qty_on_hand into v_num from inventory_items where id = v_inv;
+    select count(*) into v_n2 from order_costs where order_id = o1 and source_type = 'inventory';
+    insert into _t(grp,test,expect,actual,pass) values ('N','領料扣庫存並掛工單成本','剩 7、成本 +1',
+      '剩 '||v_num||'、成本 +'||v_n2, v_num = 7 and v_n2 = 1);
+    begin
+      perform public.inventory_issue(v_inv, 100, null, null);
+      insert into _t(grp,test,expect,actual,pass) values ('N','領料超過庫存','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','領料超過庫存','擋下','擋下', true);
+    end;
+    perform public.inventory_adjust(v_inv, 5, 'TEST 盤點');
+    select qty_on_hand into v_num from inventory_items where id = v_inv;
+    insert into _t(grp,test,expect,actual,pass) values ('N','盤點調整','5', v_num::text, v_num = 5);
+    begin
+      update inventory_items set qty_on_hand = 999 where id = v_inv;
+      insert into _t(grp,test,expect,actual,pass) values ('N','主管直接改庫存數量','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','主管直接改庫存數量','擋下','擋下', true);
+    end;
+
+    -- 外包：完工成本、事後調整金額
+    select count(*) into v_n from order_costs where source_id = v_link and cost_type = 'outsource';
+    insert into _t(grp,test,expect,actual,pass) values ('N','外包完工寫入發包方工單成本','1 筆', v_n||' 筆', v_n = 1);
+    perform public.adjust_outsource_amount(v_link, 2500, 'TEST 加印');
+    execute 'reset role';
+    select l.agreed_amount::text||'/'||p.amount||'/'||rv.amount||'/'||(select amount from order_costs where source_id = v_link and cost_type = 'outsource')
+      into v_txt
+      from cross_company_links l join payables p on p.id = l.payable_id join receivables rv on rv.id = l.receivable_id
+     where l.id = v_link;
+    insert into _t(grp,test,expect,actual,pass) values ('N','調整外包金額→連結／應付／對方應收／成本同步','2500 ×4', v_txt,
+      v_txt = '2500/2500/2500/2500');
+    select count(*) into v_n from cross_company_events where link_id = v_link and event = 'amount_adjust';
+    insert into _t(grp,test,expect,actual,pass) values ('N','調整金額寫入跨公司事件','1 筆', v_n||' 筆', v_n = 1);
+    execute 'set local role authenticated';
+
+    -- 外部廠商一鍵建進貨單
+    select t.id into tk from order_tasks t where t.order_id = o4 and t.status = 'pending' order by step_no limit 1;
+    v_res := public.create_outsource_purchase(tk.id, V_NET30, 1000, null);
+    select amount_total::text || '/' || status || '/' || source_type into v_txt from purchases where id = (v_res->>'purchase_id')::uuid;
+    insert into _t(grp,test,expect,actual,pass) values ('N','外部廠商外包一鍵建進貨單（草稿、direct、含稅）','1050/draft/direct', v_txt, v_txt = '1050/draft/direct');
+    begin
+      perform public.create_outsource_purchase(tk.id, V_YR, 1000, null);
+      insert into _t(grp,test,expect,actual,pass) values ('N','集團內廠商用一鍵進貨','擋下（應走派外包）','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','集團內廠商用一鍵進貨','擋下（應走派外包）','擋下', true);
+    end;
+
+    -- 集團 KPI
+    begin
+      perform * from public.group_kpis();
+      insert into _t(grp,test,expect,actual,pass) values ('N','主管查集團 KPI','擋下','未擋', false);
+    exception when others then
+      insert into _t(grp,test,expect,actual,pass) values ('N','主管查集團 KPI','擋下','擋下', true);
+    end;
+    insert into holidays(company_id, holiday_date, name, kind) values (XX, date '2027-08-08', 'TEST 公司假', 'company');
+    get diagnostics v_n = row_count;
+    insert into _t(grp,test,expect,actual,pass) values ('N','主管新增假日','1 列', v_n||' 列', v_n = 1);
+    execute 'reset role';
+
+    perform set_config('request.jwt.claims', json_build_object('sub', uO, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*), sum(wip_orders) into v_n, v_n2 from public.group_kpis();
+    insert into _t(grp,test,expect,actual,pass) values ('N','老闆查集團 KPI 兩家並排','2 家', v_n||' 家（進行中工單 '||v_n2||'）', v_n = 2);
+    execute 'reset role';
+
+    -- 國定假日加班
+    insert into attendances(company_id, employee_id, shift_id, work_date, clock_in_at, clock_out_at, status,
+                            work_minutes, early_leave_minutes, ot_minutes_134)
+    values (XX, eXS, '36a2c910-ee73-4ca3-ab6e-88a2ad392faf', date '2026-12-25',
+            timestamptz '2026-12-25 09:00+08', timestamptz '2026-12-25 15:00+08', 'early_leave', 300, 180, 0);
+    select ot_minutes_holiday::text || '/' || status into v_txt from attendances where employee_id = eXS and work_date = date '2026-12-25';
+    insert into _t(grp,test,expect,actual,pass) values ('N','國定假日出勤→工時全列假日加班、不算早退','300/normal', v_txt, v_txt = '300/normal');
+  end;
+
   perform set_config('request.jwt.claims', '{"role":"anon"}', true);
   execute 'set local role anon';
   begin
@@ -390,6 +580,12 @@ begin
     insert into _t(grp,test,expect,actual,pass) values ('C1','未登入取登入頁公司清單','可取得', v_n||' 家', v_n = 2);
   exception when others then
     insert into _t(grp,test,expect,actual,pass) values ('C1','未登入取登入頁公司清單','可取得','錯誤：'||left(sqlerrm,40), false);
+  end;
+  begin
+    perform * from public.group_kpis();
+    insert into _t(grp,test,expect,actual,pass) values ('C2','未登入查集團 KPI','拒絕','未擋', false);
+  exception when others then
+    insert into _t(grp,test,expect,actual,pass) values ('C2','未登入查集團 KPI','拒絕','拒絕', true);
   end;
   execute 'reset role';
 end $tests$;
