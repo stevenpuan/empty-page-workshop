@@ -28,8 +28,8 @@ export const Route = createFileRoute("/dashboard/board/tv")({
 
 /** 電視模式只顯示活躍欄位（隱藏 done / skipped） */
 const COLUMNS: ReadonlyArray<readonly [string, string]> = [
-  ["pending", "待排工"],
-  ["assigned", "已指派"],
+  ["pending", "待接"],
+  ["assigned", "指定給人"],
   ["in_progress", "進行中"],
   ["blocked", "卡關"],
   ["waiting_customer", "等客戶"],
@@ -89,7 +89,7 @@ function TvBoard() {
       const { data, error } = await supabase
         .from("order_tasks")
         .select(
-          "id, status, blocked_reason, assignee_id, station_id, order_id, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
+          "id, status, blocked_reason, assignee_id, station_id, order_id, step_no, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
         )
         .not("status", "in", "(done,skipped)")
         .order("created_at", { ascending: true });
@@ -97,6 +97,17 @@ function TvBoard() {
       return data as unknown as BoardTask[];
     },
   });
+
+  // 每張訂單只顯示輪到的那一步
+  const firstOpen = new Map<string, number>();
+  for (const t of tasks) {
+    if (!t.order_id) continue;
+    const n = t.step_no ?? 0;
+    const prev = firstOpen.get(t.order_id);
+    if (prev === undefined || n < prev) firstOpen.set(t.order_id, n);
+  }
+  const isCurrent = (t: BoardTask) =>
+    !t.order_id || (t.step_no ?? 0) <= (firstOpen.get(t.order_id) ?? 0);
 
   // 右下角「最後更新 HH:mm:ss」
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -120,7 +131,11 @@ function TvBoard() {
 
       <div className="grid min-h-0 flex-1 grid-cols-6 gap-3 p-4">
         {COLUMNS.map(([status, label]) => {
-          const items = tasks.filter((t) => t.status === status);
+          const items = tasks.filter(
+            (t) =>
+              t.status === status &&
+              (status !== "pending" && status !== "assigned" ? true : isCurrent(t)),
+          );
           return (
             <div
               key={status}

@@ -107,7 +107,7 @@ function statusTone(status: string) {
 }
 
 function Page() {
-  const { employee } = useAuth();
+  const { employee, company } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   useBoardRealtime();
@@ -137,6 +137,50 @@ function Page() {
       return data as unknown as MyTask[];
     },
   });
+
+  // 可以接的工作：進行中訂單裡「輪到的那一步」且還沒人接
+  const { data: available = [] } = useQuery({
+    queryKey: ["available_tasks", company?.id],
+    enabled: !!company?.id,
+    queryFn: async (): Promise<MyTask[]> => {
+      const { data, error } = await supabase
+        .from("order_tasks")
+        .select(
+          "id, status, order_id, blocked_reason, step_no, orders:order_id!inner(order_no, item_name, due_date, status), work_stations:station_id(name, color)",
+        )
+        .eq("company_id", company!.id)
+        .eq("orders.status", "active")
+        .not("status", "in", "(done,skipped)")
+        .order("step_no");
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as MyTask[];
+      const first = new Map<string, number>();
+      for (const t of rows) {
+        if (!t.order_id) continue;
+        const n = t.step_no ?? 0;
+        const prev = first.get(t.order_id);
+        if (prev === undefined || n < prev) first.set(t.order_id, n);
+      }
+      return rows
+        .filter(
+          (t) => t.status === "pending" && !!t.order_id && (t.step_no ?? 0) === first.get(t.order_id),
+        )
+        .sort((a, b) =>
+          (a.orders?.due_date ?? "9999-12-31").localeCompare(b.orders?.due_date ?? "9999-12-31"),
+        );
+    },
+  });
+
+  const claim = async (t: MyTask) => {
+    const { error } = await supabase.rpc("task_claim", { p_task_id: t.id });
+    if (error) {
+      toast.error(humanizeError(error, "接下工作"));
+      return;
+    }
+    toast.success("已接下，做完請按「完成」");
+    reload();
+    void qc.invalidateQueries({ queryKey: ["available_tasks"] });
+  };
 
   const sorted = useMemo(() => {
     return [...tasks].sort((a, b) => {
@@ -220,7 +264,40 @@ function Page() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="我的工作" description="只顯示指派給你的工序，可直接開始、完成或回報卡關。" />
+      <PageHeader
+        title="我的工作"
+        description="上面是可以接的工作（誰有空誰接），下面是你手上的工作。"
+      />
+
+      {available.length > 0 && (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            <p className="font-medium">可以接的工作（{available.length}）</p>
+            {available.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between gap-3 rounded-md border p-2.5"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {t.orders?.item_name ?? "—"}
+                    <span className="ml-2 font-mono text-xs text-muted-foreground">
+                      {t.orders?.order_no}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {t.work_stations?.name ?? "—"}・第 {t.step_no} 步
+                    {t.orders?.due_date ? `・交期 ${fmtDate(t.orders.due_date)}` : ""}
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => void claim(t)}>
+                  我來做
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {loadErr && <p className="text-sm text-destructive">{humanizeError(loadErr, "載入我的工作")}</p>}
 

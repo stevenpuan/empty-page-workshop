@@ -61,8 +61,8 @@ export const Route = createFileRoute("/dashboard/board/")({
 });
 
 const COLUMNS: ReadonlyArray<readonly [string, string]> = [
-  ["pending", "待排工"],
-  ["assigned", "已指派"],
+  ["pending", "待接"],
+  ["assigned", "指定給人"],
   ["in_progress", "進行中"],
   ["blocked", "卡關"],
   ["waiting_customer", "等客戶"],
@@ -120,7 +120,8 @@ interface Station {
 }
 
 function Page() {
-  const { company, isManager } = useAuth();
+  const { company, isManager, employee } = useAuth();
+  const meId = employee?.id ?? null;
   const navigate = useNavigate();
   const qc = useQueryClient();
   const canDrag = isManager;
@@ -149,7 +150,7 @@ function Page() {
       const { data, error } = await supabase
         .from("order_tasks")
         .select(
-          "id, status, blocked_reason, assignee_id, station_id, order_id, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
+          "id, status, blocked_reason, assignee_id, station_id, order_id, step_no, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
         )
         .or(`status.not.in.(done,skipped),updated_at.gte.${new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()}`)
         .order("created_at", { ascending: true });
@@ -220,9 +221,24 @@ function Page() {
     };
   }, [company?.id, qc]);
 
+  // 每張訂單「輪到的那一步」：還沒完成的工序裡步驟最小的。後面的步驟先不顯示，看板才不會擠滿。
+  const currentStep = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of tasks) {
+      if (!t.order_id || t.status === "done" || t.status === "skipped") continue;
+      const n = t.step_no ?? 0;
+      const prev = m.get(t.order_id);
+      if (prev === undefined || n < prev) m.set(t.order_id, n);
+    }
+    return m;
+  }, [tasks]);
+  const isCurrent = (t: BoardTask) =>
+    !t.order_id || (t.step_no ?? 0) <= (currentStep.get(t.order_id) ?? 0);
+
   const filtered = useMemo(() => {
     const kw = search.trim().toLowerCase();
     return tasks.filter((t) => {
+      if ((t.status === "pending" || t.status === "assigned") && !isCurrent(t)) return false;
       if (stationFilter.length && (!t.station_id || !stationFilter.includes(t.station_id)))
         return false;
       if (assigneeFilter !== "all") {
@@ -235,7 +251,8 @@ function Page() {
       }
       return true;
     });
-  }, [tasks, stationFilter, assigneeFilter, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, stationFilter, assigneeFilter, search, currentStep]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -247,6 +264,32 @@ function Page() {
     }
     reload();
     return data;
+  };
+
+  const claim = async (task: BoardTask) => {
+    const res = await runRpc("task_claim", { p_task_id: task.id }, "接下工作");
+    if (res !== null) toast.success("已接下，做完請按「做好了」");
+  };
+  const finish = async (task: BoardTask) => {
+    const raw = (await runRpc("task_finish", { p_task_id: task.id }, "完成工序")) as
+      | (TaskDoneResult & { only_ship_left?: boolean })
+      | null;
+    if (raw === null) return;
+    const orderId = raw.order_id ?? task.order_id;
+    const orderNo = raw.order_no ?? task.orders?.order_no ?? "";
+    const goDeliver = orderId
+      ? {
+          label: "開立出貨單",
+          onClick: () => void navigate({ to: "/dashboard/orders/$orderId", params: { orderId } }),
+        }
+      : undefined;
+    if (raw.order_all_done) {
+      toast.success(`訂單 ${orderNo} 全部完成！`, { action: goDeliver, duration: 10000 });
+    } else if (raw.only_ship_left) {
+      toast.success(`訂單 ${orderNo} 只剩出貨，可開立出貨單`, { action: goDeliver, duration: 10000 });
+    } else {
+      toast.success("完成，下一步已通知大家");
+    }
   };
 
   const move = async (task: BoardTask, to: string) => {
@@ -381,8 +424,8 @@ function Page() {
         title="派工看板"
         description={
           canDrag
-            ? "拖拉卡片可推進工序狀態；卡關需填理由。畫面會即時同步其他人的操作。"
-            : "檢視各工序目前狀態。畫面會即時同步。（只有主管以上可拖拉推進）"
+            ? "每張訂單只顯示輪到的那一步。誰有空按「我來做」，做完按「做好了」；主管也可以拖拉或指派。"
+            : "每張訂單只顯示輪到的那一步。誰有空按「我來做」，做完按「做好了」。"
         }
         actions={
           <Button variant="outline" asChild>
@@ -488,6 +531,21 @@ function Page() {
                       key={t.id}
                       task={t}
                       canDrag={canDrag}
+                      footer={
+                        <>
+                          {(t.status === "pending" ||
+                            (t.status === "assigned" && (t.assignee_id === meId || isManager))) && (
+                            <Button size="sm" className="h-7 px-2" onClick={() => void claim(t)}>
+                              我來做
+                            </Button>
+                          )}
+                          {t.status === "in_progress" && (t.assignee_id === meId || isManager) && (
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => void finish(t)}>
+                              做好了
+                            </Button>
+                          )}
+                        </>
+                      }
                       onAssign={(task) => {
                         setAssignee(task.assignee_id ?? "");
                         setAssignTarget(task);
@@ -628,10 +686,12 @@ function DraggableCard({
   task,
   canDrag,
   onAssign,
+  footer,
 }: {
   task: BoardTask;
   canDrag: boolean;
   onAssign: (t: BoardTask) => void;
+  footer?: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
@@ -645,6 +705,7 @@ function DraggableCard({
         canAssign={canDrag && !NO_ASSIGN_STATUSES.includes(task.status)}
         onAssign={onAssign}
         dragProps={canDrag ? { ...listeners, ...attributes } : undefined}
+        footer={footer}
       />
     </div>
   );

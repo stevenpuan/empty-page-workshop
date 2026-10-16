@@ -27,6 +27,7 @@ import { Route as DashboardMyWorkRouteImport } from './routes/dashboard/my-work'
 import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
 import { Route as DashboardOutsourceRouteImport } from './routes/dashboard/outsource'
 import { Route as DashboardPayablesRouteImport } from './routes/dashboard/payables'
+import { Route as DashboardPerformanceRouteImport } from './routes/dashboard/performance'
 import { Route as DashboardProductsRouteImport } from './routes/dashboard/products'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardPurchasesRouteImport } from './routes/dashboard/purchases'
@@ -139,6 +140,11 @@ const DashboardOutsourceRoute = DashboardOutsourceRouteImport.update({
 const DashboardPayablesRoute = DashboardPayablesRouteImport.update({
   id: '/payables',
   path: '/payables',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardPerformanceRoute = DashboardPerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardProductsRoute = DashboardProductsRouteImport.update({
@@ -282,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/payables': typeof DashboardPayablesRoute
+  '/dashboard/performance': typeof DashboardPerformanceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
@@ -322,6 +329,7 @@ export interface FileRoutesByTo {
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/payables': typeof DashboardPayablesRoute
+  '/dashboard/performance': typeof DashboardPerformanceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
@@ -366,6 +374,7 @@ export interface FileRoutesById {
   '/dashboard/notifications': typeof DashboardNotificationsRoute
   '/dashboard/outsource': typeof DashboardOutsourceRoute
   '/dashboard/payables': typeof DashboardPayablesRoute
+  '/dashboard/performance': typeof DashboardPerformanceRoute
   '/dashboard/products': typeof DashboardProductsRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
@@ -411,6 +420,7 @@ export interface FileRouteTypes {
     | '/dashboard/notifications'
     | '/dashboard/outsource'
     | '/dashboard/payables'
+    | '/dashboard/performance'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/purchases'
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/dashboard/notifications'
     | '/dashboard/outsource'
     | '/dashboard/payables'
+    | '/dashboard/performance'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/purchases'
@@ -494,6 +505,7 @@ export interface FileRouteTypes {
     | '/dashboard/notifications'
     | '/dashboard/outsource'
     | '/dashboard/payables'
+    | '/dashboard/performance'
     | '/dashboard/products'
     | '/dashboard/profile'
     | '/dashboard/purchases'
@@ -655,6 +667,13 @@ declare module '@tanstack/react-router' {
       path: '/payables'
       fullPath: '/dashboard/payables'
       preLoaderRoute: typeof DashboardPayablesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/performance': {
+      id: '/dashboard/performance'
+      path: '/performance'
+      fullPath: '/dashboard/performance'
+      preLoaderRoute: typeof DashboardPerformanceRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/products': {
@@ -858,6 +877,7 @@ interface DashboardRouteChildren {
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardOutsourceRoute: typeof DashboardOutsourceRoute
   DashboardPayablesRoute: typeof DashboardPayablesRoute
+  DashboardPerformanceRoute: typeof DashboardPerformanceRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardPurchasesRoute: typeof DashboardPurchasesRoute
@@ -893,6 +913,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardOutsourceRoute: DashboardOutsourceRoute,
   DashboardPayablesRoute: DashboardPayablesRoute,
+  DashboardPerformanceRoute: DashboardPerformanceRoute,
   DashboardProductsRoute: DashboardProductsRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardPurchasesRoute: DashboardPurchasesRoute,

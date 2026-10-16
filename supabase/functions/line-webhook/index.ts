@@ -4,7 +4,10 @@ import {
   handleQuickImage,
   handleQuickPostback,
   handleQuickText,
+  handleTaskPostback,
+  handleTaskText,
   QUICK_HELP,
+  TASK_HELP,
   type LineMessage,
 } from "./quick.ts";
 
@@ -117,6 +120,9 @@ async function handleEvent(event: LineEvent): Promise<unknown> {
 
   // ── 按鈕（快單派工／開始／完成） ──
   if (event.type === "postback" && event.postback?.data) {
+    if (event.postback.data.startsWith("ot:")) {
+      return await handleTaskPostback(event.postback.data, lineUserId, event.replyToken!, replyMessage);
+    }
     return await handleQuickPostback(event.postback.data, lineUserId, event.replyToken!, replyMessage);
   }
 
@@ -132,6 +138,8 @@ async function handleEvent(event: LineEvent): Promise<unknown> {
     // 快單指令（快單…、收款…、開始／完成／取消…）
     const quick = await handleQuickText(text, lineUserId, event.replyToken!, replyMessage);
     if (quick !== null) return quick;
+    const task = await handleTaskText(text, lineUserId, event.replyToken!, replyMessage);
+    if (task !== null) return task;
 
     // 指令：解綁
     if (text === "解綁") {
@@ -154,7 +162,9 @@ async function handleEvent(event: LineEvent): Promise<unknown> {
             "• 輸入「狀態」→ 查看綁定狀態\n" +
             "• 輸入「解綁」→ 解除LINE綁定\n" +
             "• 輸入「幫助」→ 顯示此說明\n\n" +
-            QUICK_HELP,
+            QUICK_HELP +
+            "\n\n" +
+            TASK_HELP,
         },
       ]);
       return { type: "help", replied: true };

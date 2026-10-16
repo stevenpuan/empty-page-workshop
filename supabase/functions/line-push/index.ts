@@ -111,6 +111,15 @@ async function quickJobButtons(notificationId: string) {
     .select("rule_code, ref_type, ref_id")
     .eq("id", notificationId)
     .maybeSingle();
+  if (n?.ref_type === "order_task" && n.ref_id && n.rule_code === "task_available") {
+    const { data: task } = await admin.from("order_tasks").select("id, status").eq("id", n.ref_id).maybeSingle();
+    if (!task || !["pending", "assigned"].includes(task.status)) return null;
+    return {
+      items: [
+        { type: "action", action: { type: "postback", label: "我來做", data: `ot:claim:${task.id}`, displayText: "我來做" } },
+      ],
+    };
+  }
   if (!n || n.ref_type !== "quick_job" || !n.ref_id) return null;
   const { data: job } = await admin
     .from("quick_jobs")

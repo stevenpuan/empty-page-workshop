@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AlertTriangle, Truck, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ export interface BoardTask {
   assignee_id: string | null;
   station_id: string | null;
   order_id: string | null;
+  step_no?: number | null;
   orders: { order_no: string; item_name: string | null; due_date: string | null } | null;
   work_stations: { name: string; color: string | null } | null;
   employees: { name: string } | null;
@@ -29,6 +31,7 @@ export function JobCard({
   dragProps,
   overlay,
   compact = true,
+  footer,
 }: {
   task: BoardTask;
   draggable?: boolean;
@@ -37,6 +40,8 @@ export function JobCard({
   dragProps?: Record<string, unknown> | undefined;
   overlay?: boolean;
   compact?: boolean;
+  /** 卡片底部的動作按鈕（我來做、做好了） */
+  footer?: ReactNode;
 }) {
   const due = task.orders?.due_date ?? null;
   const overdue = !!due && due < taipeiToday() && task.status !== "done" && task.status !== "skipped";
@@ -92,11 +97,12 @@ export function JobCard({
               style={{ backgroundColor: task.work_stations.color ?? "#94a3b8" }}
             />
             {task.work_stations.name}
+            {task.step_no ? `・第 ${task.step_no} 步` : ""}
           </span>
         )}
         <span className="inline-flex items-center gap-1">
           <User className={compact ? "h-3 w-3" : "h-4 w-4"} />
-          {task.employees?.name ?? "未指派"}
+          {task.employees?.name ?? "待接"}
         </span>
       </div>
 
@@ -119,6 +125,16 @@ export function JobCard({
           <Truck className="h-3 w-3 mr-1" />
           {task.vendors?.name ?? "外包中"}
         </Badge>
+      )}
+
+      {footer && !overlay && (
+        <div
+          className="flex flex-wrap gap-1"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {footer}
+        </div>
       )}
 
       {canAssign && onAssign && !overlay && (

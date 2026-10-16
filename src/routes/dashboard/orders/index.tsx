@@ -104,7 +104,13 @@ interface OrderDraft {
   due_date: string;
   status: string;
   routing_template_id: string | null;
+  designer_id: string | null;
   note: string;
+}
+
+interface Progress {
+  text: string;
+  waiting: boolean;
 }
 
 const PAGE_SIZE = 50;
@@ -140,6 +146,7 @@ const blank = (): OrderDraft => ({
   due_date: "",
   status: "draft",
   routing_template_id: null,
+  designer_id: null,
   note: "",
 });
 
@@ -177,6 +184,67 @@ function Page() {
     },
   });
   const reload = () => qc.invalidateQueries({ queryKey: ["orders", company?.id] });
+
+  // 目前進度：每張進行中訂單輪到哪一步、誰在做
+  const activeIds = rows.filter((o) => o.status === "active").map((o) => o.id);
+  const { data: progress = {} } = useQuery({
+    queryKey: ["orders_progress", company?.id, activeIds.join(",")],
+    enabled: activeIds.length > 0,
+    queryFn: async (): Promise<Record<string, Progress>> => {
+      const { data, error } = await supabase
+        .from("order_tasks")
+        .select("order_id, step_no, status, work_stations:station_id(name), employees:assignee_id(name)")
+        .in("order_id", activeIds)
+        .order("step_no");
+      if (error) throw error;
+      const byOrder = new Map<string, { step_no: number; status: string; station: string; who: string | null }[]>();
+      for (const r of (data ?? []) as unknown as {
+        order_id: string;
+        step_no: number;
+        status: string;
+        work_stations: { name: string } | null;
+        employees: { name: string } | null;
+      }[]) {
+        const list = byOrder.get(r.order_id) ?? [];
+        list.push({
+          step_no: r.step_no,
+          status: r.status,
+          station: r.work_stations?.name ?? "—",
+          who: r.employees?.name ?? null,
+        });
+        byOrder.set(r.order_id, list);
+      }
+      const out: Record<string, Progress> = {};
+      for (const [id, list] of byOrder) {
+        const finished = list.filter((t) => t.status === "done" || t.status === "skipped").length;
+        const cur = list.find((t) => t.status !== "done" && t.status !== "skipped");
+        if (!cur) {
+          out[id] = { text: `全部完成（${finished}/${list.length}）`, waiting: false };
+          continue;
+        }
+        const waiting = cur.status === "pending";
+        const who =
+          cur.status === "outsourced" ? "外包中" : waiting ? "待接" : (cur.who ?? "待接");
+        out[id] = { text: `${cur.station}・${who}（${finished}/${list.length}）`, waiting };
+      }
+      return out;
+    },
+  });
+
+  const { data: staff = [] } = useQuery({
+    queryKey: ["orders_staff", company?.id],
+    enabled: !!company?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, name")
+        .eq("company_id", company!.id)
+        .eq("is_active", true)
+        .order("emp_no");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
+    },
+  });
 
   // ---- 下拉選項 ----
   const { data: customers = [] } = useQuery({
@@ -236,7 +304,7 @@ function Page() {
       routing_template_id: p?.default_routing_template_id ?? form.routing_template_id,
     });
   };
-  const save = async () => {
+  const save = async (status: "active" | "draft") => {
     if (!form || !company) return;
     if (!form.customer_id) {
       toast.error("請選擇客戶");
@@ -259,8 +327,9 @@ function Page() {
       // 含稅總額由 DB trigger 計算（amount_total = 未稅 + 稅額），前端不送
       tax_amount: Number(form.tax_amount) || 0,
       due_date: form.due_date || null,
-      status: form.status || "draft",
+      status,
       routing_template_id: form.routing_template_id || null,
+      designer_id: form.designer_id || null,
       note: form.note.trim() || null,
     };
     const { data, error } = await supabase.from("orders").insert(payload).select("id");
@@ -272,7 +341,9 @@ function Page() {
       toast.error("沒有寫入任何資料（可能沒有權限），請重新整理後再試");
       return;
     }
-    toast.success("已新增訂單");
+    toast.success(
+      status === "active" ? "已建立訂單並開工，已通知大家接工作" : "已存成草稿（之後在列表按「開工」）",
+    );
     setForm(null);
     setPage(0);
     reload();
@@ -295,7 +366,7 @@ function Page() {
       toast.error("訂單狀態沒有更新（可能沒有權限），請重新整理後再試");
       return;
     }
-    toast.success(next === "active" ? "訂單已確認" : "訂單已作廢");
+    toast.success(next === "active" ? "已開工，已通知大家接工作" : "訂單已作廢");
     setVoidTarget(null);
     reload();
   };
@@ -306,7 +377,7 @@ function Page() {
     <div className="space-y-6">
       <PageHeader
         title="訂單管理"
-        description="訂單列表：草稿可確認，確認後自動展開工序；草稿／進行中訂單可作廢（不可恢復）。"
+        description="建立訂單時按「建立並開工」，工序自動展開並通知大家接工作；進度欄看得到目前做到哪一步。"
         actions={
           canCreate ? (
             <Button onClick={openNew}>
@@ -348,20 +419,21 @@ function Page() {
                 <TableHead className="text-right">含稅金額</TableHead>
                 <TableHead>交期</TableHead>
                 <TableHead>狀態</TableHead>
+                <TableHead>目前進度</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     載入中…
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     尚無訂單，請按「新增訂單」
                   </TableCell>
                 </TableRow>
@@ -403,6 +475,11 @@ function Page() {
                       {statusLabel(o.status)}
                     </Badge>
                   </TableCell>
+                  <TableCell
+                    className={`whitespace-nowrap text-sm ${progress[o.id]?.waiting ? "font-medium text-amber-600" : ""}`}
+                  >
+                    {o.status === "active" ? (progress[o.id]?.text ?? "—") : "—"}
+                  </TableCell>
                   {/* 操作選單不觸發整列跳轉（Radix portal 的事件仍會沿 React 樹冒泡到這裡） */}
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     {canEdit && (o.status === "draft" || o.status === "active") && (
@@ -415,7 +492,7 @@ function Page() {
                         <DropdownMenuContent align="end">
                           {o.status === "draft" && (
                             <DropdownMenuItem onClick={() => updateStatus(o, "active")}>
-                              確認訂單（展開工序）
+                              開工（展開工序並通知大家）
                             </DropdownMenuItem>
                           )}
                           {(o.status === "draft" || o.status === "active") && (
@@ -470,7 +547,7 @@ function Page() {
           <DialogHeader>
             <DialogTitle>新增訂單</DialogTitle>
             <DialogDescription>
-              單號留空將由系統自動產生。選擇「確認」狀態時，儲存後會自動展開工序。
+              單號留空會自動產生。按「建立並開工」會展開工序、通知大家接工作；還沒談定的先存草稿。
             </DialogDescription>
           </DialogHeader>
           {form && (
@@ -606,26 +683,28 @@ function Page() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>狀態</Label>
+                  <Label>設計由誰做</Label>
                   <Select
-                    value={form.status}
-                    onValueChange={(v) => setForm({ ...form, status: v })}
+                    value={form.designer_id ?? "none"}
+                    onValueChange={(v) => setForm({ ...form, designer_id: v === "none" ? null : v })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="draft">草稿</SelectItem>
-                      <SelectItem value="active">確認</SelectItem>
+                      <SelectItem value="none">不指定（預設設計人員，沒有就大家接）</SelectItem>
+                      {staff.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  {form.status === "active" && (
-                    <p className="text-xs text-amber-600">確認後將自動展開工序</p>
-                  )}
+                  <p className="text-xs text-muted-foreground">其他工序不指定人，誰有空誰接</p>
                 </div>
               </div>
               <div className="space-y-1">
-                <Label>工序範本</Label>
+                <Label>工序流程</Label>
                 <Select
                   value={form.routing_template_id ?? "none"}
                   onValueChange={(v) =>
@@ -633,10 +712,10 @@ function Page() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="未指定" />
+                    <SelectValue placeholder="公司預設" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">未指定</SelectItem>
+                    <SelectItem value="none">公司預設（設計→製作→出貨）</SelectItem>
                     {templates.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
@@ -659,7 +738,10 @@ function Page() {
             <Button variant="outline" onClick={() => setForm(null)}>
               取消
             </Button>
-            <Button onClick={save}>新增</Button>
+            <Button variant="outline" onClick={() => void save("draft")}>
+              存草稿
+            </Button>
+            <Button onClick={() => void save("active")}>建立並開工</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

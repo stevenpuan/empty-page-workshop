@@ -12,6 +12,9 @@ export function useBoardRealtime() {
         { event: "*", schema: "public", table: "order_tasks" },
         () => {
           qc.invalidateQueries({ queryKey: ["order_tasks_board"] });
+          qc.invalidateQueries({ queryKey: ["available_tasks"] });
+          qc.invalidateQueries({ queryKey: ["my_work_tasks"] });
+          qc.invalidateQueries({ queryKey: ["orders_progress"] });
         },
       )
       .subscribe();

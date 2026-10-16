@@ -506,3 +506,113 @@ export const QUICK_HELP =
   "• 開始 單號／完成 單號\n" +
   "• 收款 單號 金額 [現金/轉帳/未收]\n" +
   "• 取消 單號 原因";
+
+/* ───────────────────────── 訂單工序：我來做／做好了 ───────────────────────── */
+
+interface TaskResult {
+  task_id: string;
+  new_status: string;
+  order_no: string;
+  label: string;
+  station_code: string;
+  order_all_done: boolean;
+  only_ship_left: boolean;
+}
+
+function doneButton(taskId: string) {
+  return {
+    items: [
+      {
+        type: "action",
+        action: { type: "postback", label: "做好了", data: `ot:done:${taskId}`, displayText: "做好了" },
+      },
+    ],
+  };
+}
+
+export async function handleTaskPostback(
+  data: string,
+  lineUserId: string,
+  replyToken: string,
+  reply: Reply,
+): Promise<unknown> {
+  const [ns, action, taskId] = data.split(":");
+  if (ns !== "ot" || !["claim", "done"].includes(action ?? "") || !taskId) {
+    return { type: "task_postback", skipped: true };
+  }
+  const { data: res, error } = await db().rpc("line_task_action", {
+    p_line_user_id: lineUserId,
+    p_action: action,
+    p_task_id: taskId,
+  });
+  if (error) {
+    await reply(replyToken, [{ type: "text", text: `❌ ${errText(error)}` }]);
+    return { type: "task_postback", action, error: error.message };
+  }
+  const r = res as TaskResult;
+  if (action === "claim") {
+    await reply(replyToken, [
+      {
+        type: "text",
+        text: `🔧 你接下了這個工作\n${r.label}\n\n做完請按「做好了」。`,
+        quickReply: doneButton(r.task_id),
+      },
+    ]);
+  } else {
+    let tail = "下一步已通知大家。";
+    if (r.order_all_done) tail = "這張訂單全部完成了！請到系統開立出貨單。";
+    else if (r.only_ship_left) tail = "只剩出貨，請到系統開立出貨單（開單時會自動完成出貨步驟）。";
+    await reply(replyToken, [{ type: "text", text: `✅ 完成\n${r.label}\n\n${tail}` }]);
+  }
+  return { type: "task_postback", action, order_no: r.order_no };
+}
+
+/** 「工作」：列出可以接的工作與自己手上的工作 */
+export async function handleTaskText(
+  text: string,
+  lineUserId: string,
+  replyToken: string,
+  reply: Reply,
+): Promise<unknown | null> {
+  if (!/^(工作|我的工作|待接|可接的工作)$/.test(text.trim())) return null;
+  const { data, error } = await db().rpc("line_task_list", { p_line_user_id: lineUserId });
+  if (error) {
+    await reply(replyToken, [{ type: "text", text: `❌ ${errText(error)}` }]);
+    return { type: "task_list", error: error.message };
+  }
+  const res = data as {
+    available: { id: string; label: string }[];
+    mine: { id: string; label: string; status: string }[];
+  };
+  const mine = res.mine.length
+    ? res.mine.map((t) => `・${t.label}${t.status === "in_progress" ? "（進行中）" : ""}`).join("\n")
+    : "（沒有）";
+  const avail = res.available.length
+    ? res.available.map((t, i) => `${i + 1}. ${t.label}`).join("\n")
+    : "（目前沒有）";
+  const msg: LineMessage = {
+    type: "text",
+    text: `🧰 我手上的工作\n${mine}\n\n📥 可以接的工作 ${res.available.length} 件\n${avail}`,
+  };
+  const items = [
+    ...res.mine
+      .filter((t) => t.status === "in_progress")
+      .slice(0, 6)
+      .map((t, i) => ({
+        type: "action",
+        action: { type: "postback", label: `做好了 ${i + 1}`.slice(0, 20), data: `ot:done:${t.id}`, displayText: `做好了：${t.label.split("｜")[0]}` },
+      })),
+    ...res.available.slice(0, 7).map((t, i) => ({
+      type: "action",
+      action: { type: "postback", label: `接第 ${i + 1} 件`, data: `ot:claim:${t.id}`, displayText: `我來做：${t.label.split("｜")[0]}` },
+    })),
+  ];
+  if (items.length) msg.quickReply = { items };
+  await reply(replyToken, [msg]);
+  return { type: "task_list", available: res.available.length };
+}
+
+export const TASK_HELP =
+  "🧰 訂單工作：\n" +
+  "• 工作 → 看可以接的工作和自己手上的工作\n" +
+  "• 收到「有新工作可接」通知時，按「我來做」接下；做完按「做好了」";
