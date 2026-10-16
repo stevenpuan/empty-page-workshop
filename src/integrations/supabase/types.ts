@@ -641,6 +641,7 @@ export type Database = {
           dispatched_at: string
           from_company_id: string
           from_order_id: string
+          from_order_no: string | null
           from_task_id: string
           id: string
           note: string | null
@@ -649,6 +650,7 @@ export type Database = {
           status: string
           to_company_id: string
           to_order_id: string | null
+          to_order_no: string | null
           updated_at: string
           updated_by: string | null
           vendor_id: string | null
@@ -662,6 +664,7 @@ export type Database = {
           dispatched_at?: string
           from_company_id: string
           from_order_id: string
+          from_order_no?: string | null
           from_task_id: string
           id?: string
           note?: string | null
@@ -670,6 +673,7 @@ export type Database = {
           status?: string
           to_company_id: string
           to_order_id?: string | null
+          to_order_no?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
@@ -683,6 +687,7 @@ export type Database = {
           dispatched_at?: string
           from_company_id?: string
           from_order_id?: string
+          from_order_no?: string | null
           from_task_id?: string
           id?: string
           note?: string | null
@@ -691,6 +696,7 @@ export type Database = {
           status?: string
           to_company_id?: string
           to_order_id?: string | null
+          to_order_no?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
@@ -702,6 +708,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_company_links_from_order_id_fkey"
+            columns: ["from_order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "cross_company_links_from_order_id_fkey"
@@ -751,6 +764,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_company_links_to_order_id_fkey"
+            columns: ["to_order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "cross_company_links_to_order_id_fkey"
@@ -914,6 +934,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "delivery_notes_order_id_fkey"
@@ -1353,6 +1380,13 @@ export type Database = {
             foreignKeyName: "inventory_moves_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "inventory_moves_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -1693,6 +1727,13 @@ export type Database = {
             foreignKeyName: "order_costs_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_costs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -1746,6 +1787,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_task_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "order_task_logs_order_id_fkey"
@@ -1847,6 +1895,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_tasks_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "order_tasks_order_id_fkey"
@@ -2047,6 +2102,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchases"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payables_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "payables_related_order_id_fkey"
@@ -2433,6 +2495,13 @@ export type Database = {
             foreignKeyName: "purchases_related_order_id_fkey"
             columns: ["related_order_id"]
             isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "purchases_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -2623,6 +2692,13 @@ export type Database = {
             foreignKeyName: "quotations_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "quotations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -2700,6 +2776,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receivables_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "receivables_related_order_id_fkey"
@@ -3382,6 +3465,7 @@ export type Database = {
           labor_cost: number | null
           material_cost: number | null
           order_amount: number | null
+          order_amount_untaxed: number | null
           order_id: string | null
           order_no: string | null
           other_cost: number | null
@@ -3390,17 +3474,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "order_costs_company_id_fkey"
+            foreignKeyName: "orders_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_costs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -3468,6 +3545,13 @@ export type Database = {
             foreignKeyName: "payables_related_order_id_fkey"
             columns: ["related_order_id"]
             isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payables_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -3508,6 +3592,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receivables_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "order_cost_summary"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "receivables_related_order_id_fkey"
