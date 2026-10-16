@@ -111,6 +111,7 @@ interface Collection {
 }
 
 const SOURCE_LABEL: Record<string, string> = {
+  delivery: "出貨",
   outsource: "外包",
   order: "訂單",
   manual: "手動",
@@ -709,7 +710,7 @@ function CollectionDialog({
         p_collect_date: collectDate,
         p_method: method,
         p_amount: total,
-        p_allocations: JSON.stringify(allocations),
+        p_allocations: allocations,
         p_bank_account: bankAccount.trim() || null,
         p_check_no: checkNo.trim() || null,
         p_check_due_date: checkDueDate || null,

@@ -182,9 +182,14 @@ function AttendancePage() {
   return (
     <div className="min-h-screen bg-background px-4 py-6">
       <div className="mx-auto w-full max-w-7xl space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">出勤管理</h1>
-          <p className="text-sm text-muted-foreground">{company?.name ?? ""}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">出勤管理</h1>
+            <p className="text-sm text-muted-foreground">{company?.name ?? ""}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/dashboard" })}>
+            回營運系統
+          </Button>
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
@@ -225,7 +230,14 @@ function DailyTab({ onGoAmend }: { onGoAmend: () => void }) {
       q = rangeMode ? q.gte("work_date", dateFrom).lte("work_date", dateTo) : q.eq("work_date", dateFrom);
       const { data: rows, error: err } = await q.order("work_date").order("emp_no");
       if (err) throw err;
-      return (rows ?? []) as unknown as DailyRow[];
+      // view 欄位：id / employee_name / ot_minutes_134 / ot_minutes_167 / ot_minutes_holiday
+      return ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
+        ...(r as unknown as DailyRow),
+        attendance_id: (r["id"] as string) ?? null,
+        name: (r["employee_name"] as string) ?? null,
+        overtime_minutes:
+          Number(r["ot_minutes_134"] ?? 0) + Number(r["ot_minutes_167"] ?? 0) + Number(r["ot_minutes_holiday"] ?? 0),
+      })) as DailyRow[];
     },
   });
 
@@ -280,6 +292,7 @@ function DailyTab({ onGoAmend }: { onGoAmend: () => void }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8" />
+                    {rangeMode && <TableHead>日期</TableHead>}
                     <TableHead>工號</TableHead>
                     <TableHead>姓名</TableHead>
                     <TableHead>班別</TableHead>
@@ -312,6 +325,7 @@ function DailyTab({ onGoAmend }: { onGoAmend: () => void }) {
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
                             )}
                           </TableCell>
+                          {rangeMode && <TableCell className="tabular-nums">{r.work_date.slice(5)}</TableCell>}
                           <TableCell className="tabular-nums">{r.emp_no ?? "—"}</TableCell>
                           <TableCell className="font-medium">{r.name ?? "—"}</TableCell>
                           <TableCell>{r.shift_name ?? "—"}</TableCell>
@@ -369,7 +383,7 @@ function DailyTab({ onGoAmend }: { onGoAmend: () => void }) {
                         </TableRow>
                         {open && (
                           <TableRow className="bg-muted/40 hover:bg-muted/40">
-                            <TableCell colSpan={13}>
+                            <TableCell colSpan={rangeMode ? 14 : 13}>
                               <div className="grid gap-3 py-2 text-sm sm:grid-cols-2">
                                 <DetailBlock
                                   title="上班打卡"
@@ -443,7 +457,7 @@ function AmendTab() {
     queryFn: async () => {
       const { data: rows, error: err } = await supabase
         .from("attendance_amendments")
-        .select("id, request_type, request_time, request_time_out, reason, status, created_at, employee:employees(emp_no, name)")
+        .select("id, request_type, request_time, request_time_out, reason, status, created_at, employee:employees!attendance_amendments_employee_id_fkey(emp_no, name)")
         .eq("status", "pending")
         .order("created_at");
       if (err) throw err;
@@ -587,10 +601,27 @@ function MonthlyTab() {
       const { data: rows, error: err } = await supabase
         .from("attendance_monthly_summary")
         .select("*")
-        .eq("month", month)
+        .eq("month", `${month}-01`)
         .order("emp_no");
       if (err) throw err;
-      return (rows ?? []) as unknown as MonthlyRow[];
+      // view 欄位：employee_name / total_days / missing_days / total_ot_134 / total_ot_167 / total_ot_holiday
+      return ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
+        emp_no: (r["emp_no"] as string) ?? null,
+        name: (r["employee_name"] as string) ?? null,
+        work_days: Number(r["total_days"] ?? 0) - Number(r["off_days"] ?? 0),
+        normal_days: Number(r["normal_days"] ?? 0),
+        late_days: Number(r["late_days"] ?? 0),
+        early_leave_days: Number(r["early_leave_days"] ?? 0),
+        absent_days: Number(r["absent_days"] ?? 0),
+        awol_days: Number(r["missing_days"] ?? 0),
+        total_late_minutes: Number(r["total_late_minutes"] ?? 0),
+        total_early_leave_minutes: Number(r["total_early_leave_minutes"] ?? 0),
+        total_work_minutes: Number(r["total_work_minutes"] ?? 0),
+        overtime_134_minutes: Number(r["total_ot_134"] ?? 0),
+        overtime_167_minutes: Number(r["total_ot_167"] ?? 0),
+        holiday_overtime_minutes: Number(r["total_ot_holiday"] ?? 0),
+        abnormal_count: Number(r["abnormal_count"] ?? 0),
+      })) as MonthlyRow[];
     },
   });
 
@@ -605,7 +636,7 @@ function MonthlyTab() {
       "遲到",
       "早退",
       "缺勤",
-      "曠職",
+      "缺卡",
       "遲到總分鐘",
       "早退總分鐘",
       "總工時",

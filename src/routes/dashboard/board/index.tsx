@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   PointerSensor,
   useSensor,
   useSensors,
@@ -13,6 +14,7 @@ import {
   useDroppable,
   type DragEndEvent,
   type DragStartEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { ChevronDown, ChevronRight, Monitor, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -455,7 +457,7 @@ function Page() {
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={boardCollision}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
         >
@@ -607,6 +609,18 @@ function Column({
   );
 }
 
+/**
+ * 欄位判定：先看指標落在哪一欄（看板橫向捲動時 closestCorners 會誤判到相鄰欄），
+ * 指標不在任何欄內時才退回矩形重疊判定。
+ */
+const boardCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : rectIntersection(args);
+};
+
+/** 已結束的工序（完成／跳過／外包中）不再顯示「指派」 */
+const NO_ASSIGN_STATUSES = ["done", "skipped", "outsourced"];
+
 function DraggableCard({
   task,
   canDrag,
@@ -625,7 +639,7 @@ function DraggableCard({
       <JobCard
         task={task}
         draggable={canDrag}
-        canAssign={canDrag}
+        canAssign={canDrag && !NO_ASSIGN_STATUSES.includes(task.status)}
         onAssign={onAssign}
         dragProps={canDrag ? { ...listeners, ...attributes } : undefined}
       />
