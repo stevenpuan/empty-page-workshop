@@ -11,7 +11,10 @@ import {
   ClipboardEdit,
   Smartphone,
   X,
+  ArrowLeft,
+  ChevronDown,
 } from "lucide-react";
+import { AmendmentPanel } from "@/components/attendance/AmendmentPanel";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -29,6 +32,8 @@ export const Route = createFileRoute("/clock/")({
       { property: "og:description", content: "員工每日上下班打卡。" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { amend?: string } =>
+    typeof search["amend"] === "string" ? { amend: search["amend"] } : {},
   component: ClockPage,
 });
 
@@ -76,6 +81,8 @@ function ClockPage() {
   const { session, employee, loading, permsLoaded } = useAuth();
   const [now, setNow] = useState(() => new Date());
   const [locating, setLocating] = useState<"in" | "out" | null>(null);
+  const { amend } = Route.useSearch();
+  const [amendOpen, setAmendOpen] = useState(!!amend);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -201,8 +208,18 @@ function ClockPage() {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center px-4 py-8">
+    <div className="min-h-screen bg-background flex flex-col items-center px-4 pb-8 pt-3">
       <div className="w-full max-w-md space-y-6">
+        {/* 回系統 */}
+        <div className="-mb-2">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+            <Link to="/dashboard">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              回營運系統
+            </Link>
+          </Button>
+        </div>
+
         {/* 頂部時間與員工資訊 */}
         <div className="text-center space-y-1">
           <div className="text-5xl font-mono font-bold tracking-wider tabular-nums">{timeStr}</div>
@@ -299,15 +316,29 @@ function ClockPage() {
           </CardContent>
         </Card>
 
-        {/* 補卡入口 */}
-        <div className="text-center">
-          <Button asChild variant="link" className="text-muted-foreground">
-            <Link to="/clock/amendment">
-              <ClipboardEdit className="h-4 w-4 mr-1" />
+        {/* 補卡：在這頁直接展開，不另開頁面 */}
+        <Card>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+            onClick={() => setAmendOpen((v) => !v)}
+            aria-expanded={amendOpen}
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <ClipboardEdit className="h-4 w-4 text-muted-foreground" />
               申請補卡
-            </Link>
-          </Button>
-        </div>
+              <span className="text-xs font-normal text-muted-foreground">忘記打卡或打卡異常</span>
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform ${amendOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {amendOpen && (
+            <CardContent className="border-t pt-4">
+              <AmendmentPanel />
+            </CardContent>
+          )}
+        </Card>
 
         <InstallHint />
       </div>
