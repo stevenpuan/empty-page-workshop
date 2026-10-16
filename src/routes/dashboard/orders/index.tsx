@@ -249,8 +249,8 @@ function Page() {
       qty: Number(form.qty) || 0,
       unit: form.unit.trim() || "張",
       amount_untaxed: Number(form.amount_untaxed) || 0,
+      // 含稅總額由 DB trigger 計算（amount_total = 未稅 + 稅額），前端不送
       tax_amount: Number(form.tax_amount) || 0,
-      amount_total: (Number(form.amount_untaxed) || 0) + (Number(form.tax_amount) || 0),
       due_date: form.due_date || null,
       status: form.status || "draft",
       routing_template_id: form.routing_template_id || null,
@@ -274,17 +274,18 @@ function Page() {
   // ---- 狀態操作 ----
   const [voidTarget, setVoidTarget] = useState<Order | null>(null);
   const updateStatus = async (o: Order, next: string) => {
-    const { data, error } = await supabase
-      .from("orders")
-      .update({ status: next })
-      .eq("id", o.id)
-      .select("id");
+    // 訂單狀態只能透過 set_order_status RPC 轉換（直接 update 會被 DB 擋下）
+    const { data, error } = await supabase.rpc("set_order_status", {
+      p_order_id: o.id,
+      p_status: next,
+    });
     if (error) {
       toast.error(humanizeError(error, "更新訂單狀態"));
       return;
     }
-    if (!data?.length) {
-      toast.error("沒有更新任何資料（可能沒有權限）");
+    const res = (Array.isArray(data) ? data[0] : data) as { ok?: boolean } | null;
+    if (!res?.ok) {
+      toast.error("訂單狀態沒有更新（可能沒有權限），請重新整理後再試");
       return;
     }
     toast.success(next === "active" ? "訂單已確認" : "訂單已作廢");
@@ -298,7 +299,7 @@ function Page() {
     <div className="space-y-6">
       <PageHeader
         title="訂單管理"
-        description="訂單列表：草稿可確認，確認後自動展開工序；進行中訂單可作廢（不可恢復）。"
+        description="訂單列表：草稿可確認，確認後自動展開工序；草稿／進行中訂單可作廢（不可恢復）。"
         actions={
           canCreate ? (
             <Button onClick={() => setForm(blank())}>
@@ -394,7 +395,7 @@ function Page() {
                               確認訂單（展開工序）
                             </DropdownMenuItem>
                           )}
-                          {o.status === "active" && (
+                          {(o.status === "draft" || o.status === "active") && (
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => setVoidTarget(o)}

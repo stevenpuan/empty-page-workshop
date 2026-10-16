@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Truck, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, Truck, ExternalLink, FileText, Printer } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -69,8 +69,22 @@ interface OrderRow {
   due_date: string | null;
   status: string;
   note: string | null;
-  customers: { name: string } | null;
+  customers: { name: string; contact: string | null; address: string | null } | null;
 }
+
+interface DeliveryRow {
+  id: string;
+  delivery_no: string;
+  delivery_date: string;
+  amount_total: number | string | null;
+  status: string;
+  receivables: { doc_no: string | null } | null;
+}
+
+const DELIVERY_STATUS_LABEL: Record<string, string> = {
+  issued: "已開立",
+  void: "作廢",
+};
 
 interface TaskRow {
   id: string;
@@ -143,7 +157,7 @@ function taskTone(status: string) {
 
 function Page() {
   const { orderId } = Route.useParams();
-  const { company, isManager } = useAuth();
+  const { company, isManager, can } = useAuth();
   const qc = useQueryClient();
   useBoardRealtime();
 
@@ -160,7 +174,7 @@ function Page() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_no, item_name, spec, qty, unit, amount_total, due_date, status, note, customers:customer_id(name)",
+          "id, order_no, item_name, spec, qty, unit, amount_total, due_date, status, note, customers:customer_id(name, contact, address)",
         )
         .eq("id", orderId)
         .maybeSingle();
@@ -267,6 +281,21 @@ function Page() {
     }
   };
 
+  const { data: deliveries = [], error: deliveryErr } = useQuery({
+    queryKey: ["order_delivery_notes", orderId],
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_notes")
+        .select("id, delivery_no, delivery_date, amount_total, status, receivables:receivable_id(doc_no)")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as unknown as DeliveryRow[];
+    },
+  });
+  const [showDelivery, setShowDelivery] = useState(false);
+
   const overdue = !!order?.due_date && order.due_date < taipeiToday();
 
   return (
@@ -314,6 +343,78 @@ function Page() {
               </div>
               <Progress value={pct} />
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {order && (
+        <Card>
+          <CardContent className="p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-medium inline-flex items-center gap-1.5">
+                <FileText className="h-4 w-4" />
+                出貨單
+              </h3>
+              {order.status === "active" && can("orders", "edit") && (
+                <Button size="sm" onClick={() => setShowDelivery(true)}>
+                  開立出貨單
+                </Button>
+              )}
+            </div>
+            {deliveryErr ? (
+              <p className="text-sm text-destructive">{humanizeError(deliveryErr, "載入出貨單")}</p>
+            ) : deliveries.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {order.status === "active"
+                  ? "尚未開立出貨單。除最後出貨站外，其餘工序完成（或跳過）後即可開立。"
+                  : "目前沒有出貨單。"}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>出貨單號</TableHead>
+                      <TableHead>出貨日期</TableHead>
+                      <TableHead className="text-right">含稅金額</TableHead>
+                      <TableHead>狀態</TableHead>
+                      <TableHead>應收單號</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deliveries.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-mono text-sm">{d.delivery_no}</TableCell>
+                        <TableCell className="whitespace-nowrap">{fmtDate(d.delivery_date)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatTWD(d.amount_total)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              d.status === "void"
+                                ? "bg-destructive text-destructive-foreground border-transparent"
+                                : "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/40"
+                            }
+                          >
+                            {DELIVERY_STATUS_LABEL[d.status] ?? d.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{d.receivables?.doc_no ?? "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild size="sm" variant="ghost">
+                            <Link to="/dashboard/deliveries" search={{ print: d.id }} target="_blank">
+                              <Printer className="h-3.5 w-3.5 mr-1" />
+                              列印
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -505,6 +606,21 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateDeliveryDialog
+        open={showDelivery}
+        orderId={orderId}
+        orderNo={order?.order_no ?? ""}
+        defaultReceiver={order?.customers?.contact ?? ""}
+        customerAddress={order?.customers?.address ?? ""}
+        onClose={() => setShowDelivery(false)}
+        onDone={() => {
+          void qc.invalidateQueries({ queryKey: ["order_detail", orderId] });
+          void qc.invalidateQueries({ queryKey: tasksKey });
+          void qc.invalidateQueries({ queryKey: ["order_delivery_notes", orderId] });
+          void qc.invalidateQueries({ queryKey: ["order_cost_summary", orderId] });
+        }}
+      />
 
       <DispatchOutsourceDialog
         task={dispatchTarget}
@@ -698,6 +814,117 @@ function DispatchOutsourceDialog({
           </Button>
           <Button onClick={() => void submit()} disabled={saving}>
             {saving ? "發派中…" : "確認發派"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateDeliveryDialog({
+  open,
+  orderId,
+  orderNo,
+  defaultReceiver,
+  customerAddress,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  orderId: string;
+  orderNo: string;
+  defaultReceiver: string;
+  customerAddress: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [date, setDate] = useState("");
+  const [receiver, setReceiver] = useState("");
+  const [address, setAddress] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setDate(taipeiToday());
+      setReceiver(defaultReceiver);
+      setAddress("");
+      setNote("");
+    }
+    // 只在開啟時帶入預設值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const submit = async () => {
+    setSaving(true);
+    const { data, error } = await supabase.rpc("create_delivery_note", {
+      p_order_id: orderId,
+      p_delivery_date: date || null,
+      p_receiver: receiver.trim() || null,
+      p_address: address.trim() || null,
+      p_note: note.trim() || null,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(humanizeError(error, "開立出貨單"));
+      return;
+    }
+    const res = (Array.isArray(data) ? data[0] : data) as {
+      ok?: boolean;
+      delivery_no?: string;
+      receivable_no?: string | null;
+      due_date?: string | null;
+    } | null;
+    if (!res?.ok) {
+      toast.error("出貨單沒有開立成功（可能沒有權限），請重新整理後再試");
+      return;
+    }
+    toast.success(
+      res.receivable_no
+        ? `已開立出貨單 ${res.delivery_no ?? ""}，並產生應收 ${res.receivable_no}${res.due_date ? `（到期 ${fmtDate(res.due_date)}）` : ""}`
+        : `已開立出貨單 ${res.delivery_no ?? ""}`,
+    );
+    onDone();
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>開立出貨單</DialogTitle>
+          <DialogDescription>
+            {orderNo}｜開立後訂單轉為「已出貨」，出貨站工序自動完成，並依客戶付款條件產生應收帳款。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>出貨日期 *</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>收貨人</Label>
+            <Input value={receiver} onChange={(e) => setReceiver(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>地址</Label>
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder={customerAddress ? `預設帶客戶地址：${customerAddress}` : "預設帶客戶地址"}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>備註</Label>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={() => void submit()} disabled={saving || !date}>
+            {saving ? "開立中…" : "確認開立"}
           </Button>
         </DialogFooter>
       </DialogContent>
