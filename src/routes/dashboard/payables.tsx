@@ -134,7 +134,7 @@ interface Payment {
   allocations?: {
     id: string;
     payable_id: string | null;
-    amount: number | null;
+    allocated_amount: number | null;
     payable?: { doc_no: string | null } | null;
   }[];
 }
@@ -501,12 +501,12 @@ function PayableDetail({ payable }: { payable: Payable }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payment_allocations")
-        .select("id, amount, payment:payments(payment_no, pay_date, method, status)")
+        .select("id, allocated_amount, payment:payments(payment_no, pay_date, method, status)")
         .eq("payable_id", payable.id);
       if (error) throw error;
       return (data ?? []) as unknown as {
         id: string;
-        amount: number;
+        allocated_amount: number;
         payment?: {
           payment_no: string;
           pay_date: string;
@@ -556,7 +556,7 @@ function PayableDetail({ payable }: { payable: Payable }) {
                     </Badge>
                   )}
                 </span>
-                <span className="tabular-nums">{formatTWD(a.amount)}</span>
+                <span className="tabular-nums">{formatTWD(a.allocated_amount)}</span>
               </li>
             ))}
           </ul>
@@ -588,7 +588,7 @@ function PaymentsTab() {
       const { data, error } = await supabase
         .from("payments")
         .select(
-          "id, payment_no, vendor_id, pay_date, method, amount, status, note, bank_account, check_no, check_due_date, vendor:vendors(name), allocations:payment_allocations(id, payable_id, amount, payable:payables(doc_no))",
+          "id, payment_no, vendor_id, pay_date, method, amount, status, note, bank_account, check_no, check_due_date, vendor:vendors(name), allocations:payment_allocations(id, payable_id, allocated_amount, payable:payables(doc_no))",
         )
         .eq("company_id", company!.id)
         .order("pay_date", { ascending: false });
@@ -706,7 +706,7 @@ function PaymentsTab() {
                               {(p.allocations ?? []).map((a) => (
                                 <li key={a.id} className="flex justify-between gap-3">
                                   <span className="font-mono">{a.payable?.doc_no ?? "—"}</span>
-                                  <span className="tabular-nums">{formatTWD(a.amount)}</span>
+                                  <span className="tabular-nums">{formatTWD(a.allocated_amount)}</span>
                                 </li>
                               ))}
                             </ul>
@@ -842,7 +842,7 @@ function PaymentDialog({
         p_pay_date: payDate,
         p_method: method,
         p_amount: total,
-        p_allocations: JSON.stringify(allocations),
+        p_allocations: allocations,
         p_bank_account: bankAccount.trim() || null,
         p_check_no: checkNo.trim() || null,
         p_check_due_date: checkDueDate || null,

@@ -86,6 +86,9 @@ const DELIVERY_STATUS_LABEL: Record<string, string> = {
   void: "作廢",
 };
 
+/** 已結束的工序（完成／跳過／外包中）不再提供指派、跳過 */
+const TERMINAL_TASK_STATUSES = ["done", "skipped", "outsourced"];
+
 interface TaskRow {
   id: string;
   step_no: number;
@@ -96,7 +99,7 @@ interface TaskRow {
   is_outsource: boolean;
   outsource_due_at: string | null;
   due_at: string | null;
-  work_stations: { name: string; color: string | null } | null;
+  work_stations: { name: string; color: string | null; is_outsource_capable: boolean | null } | null;
   employees: { name: string } | null;
   vendors: { name: string } | null;
 }
@@ -189,7 +192,7 @@ function Page() {
       const { data, error } = await supabase
         .from("order_tasks")
         .select(
-          "id, step_no, status, started_at, done_at, blocked_reason, is_outsource, outsource_due_at, due_at, work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
+          "id, step_no, status, started_at, done_at, blocked_reason, is_outsource, outsource_due_at, due_at, work_stations:station_id(name, color, is_outsource_capable), employees:assignee_id(name), vendors:vendor_id(name)",
         )
         .eq("order_id", orderId)
         .order("step_no");
@@ -483,30 +486,35 @@ function Page() {
                   </TableCell>
                   {isManager && (
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setAssignee("");
-                          setAssignTarget(t);
-                        }}
-                      >
-                        指派
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => void skip(t)}>
-                        跳過
-                      </Button>
-                      {["pending", "assigned", "in_progress"].includes(t.status) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDispatchTarget(t)}
-                          className="text-purple-600 dark:text-purple-400"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                          派外包
-                        </Button>
+                      {!TERMINAL_TASK_STATUSES.includes(t.status) && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setAssignee("");
+                              setAssignTarget(t);
+                            }}
+                          >
+                            指派
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => void skip(t)}>
+                            跳過
+                          </Button>
+                        </>
                       )}
+                      {["pending", "assigned", "in_progress"].includes(t.status) &&
+                        t.work_stations?.is_outsource_capable === true && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDispatchTarget(t)}
+                            className="text-purple-600 dark:text-purple-400"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                            派外包
+                          </Button>
+                        )}
                     </TableCell>
                   )}
                 </TableRow>
@@ -945,13 +953,16 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 interface CostSummaryRow {
   order_id: string;
-  revenue?: number | string | null;
-  amount_total?: number | string | null;
+  /** 訂單含稅金額 */
+  order_amount?: number | string | null;
+  /** 訂單未稅金額（營收以未稅計） */
+  order_amount_untaxed?: number | string | null;
   material_cost?: number | string | null;
   outsource_cost?: number | string | null;
   labor_cost?: number | string | null;
   other_cost?: number | string | null;
   total_cost?: number | string | null;
+  gross_profit?: number | string | null;
   [key: string]: unknown;
 }
 
@@ -1030,7 +1041,7 @@ function CostsTab({
     );
   }
 
-  const revenue = num(summary?.revenue ?? summary?.amount_total);
+  const revenue = num(summary?.order_amount_untaxed);
   const material = num(summary?.material_cost);
   const outsource = num(summary?.outsource_cost);
   const labor = num(summary?.labor_cost);
@@ -1044,7 +1055,7 @@ function CostsTab({
       <Card>
         <CardContent className="p-5 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-            <Field label="訂單金額（營收）" value={formatTWD(revenue)} />
+            <Field label="訂單金額（未稅）" value={formatTWD(revenue)} />
             <Field label="材料成本" value={formatTWD(material)} />
             <Field label="外包成本" value={formatTWD(outsource)} />
             <Field label="人工成本" value={formatTWD(labor)} />

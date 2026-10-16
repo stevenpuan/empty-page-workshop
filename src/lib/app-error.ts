@@ -98,8 +98,11 @@ const AUTH_CODE_MESSAGES: Readonly<Record<string, string>> = {
 
 const NETWORK_HINT =
   /Failed to fetch|NetworkError|network ?error|ERR_NETWORK|ERR_INTERNET_DISCONNECTED|Load failed|fetch failed/i;
-const HAS_CJK = /[㐀-䶿一-鿿豈-﫿]/;
+const HAS_CJK = /[㐀-䶿一-鿿豈-﫿]/;
 const LOOKS_LIKE_CONSTRAINT = /constraint|violat/i;
+/** 後端 raise 的錯誤有時把代碼黏在訊息前面：「P0002: 還有未完成的工序，不能出貨」 */
+const RAISE_CODE_PREFIX = /^P\d{4}:\s*/;
+const RAISE_CODE = /^P\d{4}$/;
 
 function constraintMessage(haystack: string): string | undefined {
   for (const [re, msg] of CONSTRAINT_MESSAGES) if (re.test(haystack)) return msg;
@@ -115,8 +118,14 @@ export function humanizeError(err: unknown, ctx?: string): string {
   const e = shapeOf(err);
   const haystack = [e.message, e.details, e.hint].filter(Boolean).join(" ");
 
-  // 後端 raise exception 的中文（例：「內建角色不可刪除」）原樣透出，連前綴都不加
+  // 後端 raise exception 的中文（例：「內建角色不可刪除」）原樣透出，連前綴都不加；
+  // 訊息前若黏著「P0002: 」這類代碼前綴就拿掉
+  if (e.message && RAISE_CODE_PREFIX.test(e.message)) {
+    const stripped = e.message.replace(RAISE_CODE_PREFIX, "").trim();
+    if (stripped && HAS_CJK.test(stripped)) return stripped;
+  }
   if (e.code === "P0001" && e.message) return e.message;
+  if (e.code && RAISE_CODE.test(e.code) && e.message && HAS_CJK.test(e.message)) return e.message;
   if (e.plainError && e.message && HAS_CJK.test(e.message)) return e.message;
   // Edge Function 回傳的 { error: "中文" } 也視為人寫的訊息
   if (!e.code && e.message && HAS_CJK.test(e.message)) return withCtx(e.message, ctx);
