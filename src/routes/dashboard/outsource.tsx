@@ -87,6 +87,8 @@ interface LinkRow {
   note: string | null;
   from_order_id: string | null;
   to_order_id: string | null;
+  from_order_no: string | null;
+  to_order_no: string | null;
   vendor_id: string | null;
   from_task_id: string | null;
   from_order: { order_no: string | null; item_name: string | null } | null;
@@ -188,7 +190,7 @@ function Page() {
         .from("cross_company_links")
         .select(
           `id, status, dispatched_at, agreed_amount, agreed_due_date, note,
-           from_order_id, to_order_id, vendor_id, from_task_id,
+           from_order_id, to_order_id, from_order_no, to_order_no, vendor_id, from_task_id,
            from_order:orders!cross_company_links_from_order_id_fkey(order_no, item_name),
            to_order:orders!cross_company_links_to_order_id_fkey(order_no),
            vendor:vendors(name),
@@ -250,7 +252,7 @@ function Page() {
           highlight={stats.overdue_count > 0}
         />
         <StatCard
-          label="待付金額"
+          label="進行中金額"
           value={formatTWD(stats.outstanding_amount)}
           tone="text-orange-600"
         />
@@ -403,7 +405,7 @@ function Page() {
                               params={{ orderId: l.from_order_id }}
                               className="inline-flex items-center gap-1 text-primary hover:underline"
                             >
-                              {l.from_order?.order_no ?? "—"}
+                              {l.from_order?.order_no ?? l.from_order_no ?? "—"}
                               <ExternalLink className="h-3 w-3" />
                             </Link>
                           ) : (
@@ -415,7 +417,7 @@ function Page() {
                           {l.from_order?.item_name ?? "—"}
                         </TableCell>
                         <TableCell>{l.vendor?.name ?? "—"}</TableCell>
-                        <TableCell>{l.to_order?.order_no ?? "—"}</TableCell>
+                        <TableCell>{l.to_order?.order_no ?? l.to_order_no ?? "—"}</TableCell>
                         <TableCell className="text-right">{formatTWD(l.agreed_amount)}</TableCell>
                         <TableCell
                           className={`whitespace-nowrap ${overdue ? "font-medium text-red-600" : ""}`}

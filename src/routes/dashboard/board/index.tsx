@@ -67,9 +67,11 @@ const COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ["blocked", "卡關"],
   ["waiting_customer", "等客戶"],
   ["outsourced", "外包中"],
-  ["done", "完成"],
-  ["skipped", "跳過"],
+  ["done", "完成（近 7 天）"],
+  ["skipped", "跳過（近 7 天）"],
 ];
+/** 完成／跳過欄只顯示近幾天的工序，避免歷史卡片無限累積 */
+const RECENT_DAYS = 7;
 const COLLAPSED_BY_DEFAULT = ["done", "skipped"];
 
 /** 出貨站代碼：只剩這些站沒完成時，即可開立出貨單（開立時自動完成出貨站） */
@@ -149,6 +151,7 @@ function Page() {
         .select(
           "id, status, blocked_reason, assignee_id, station_id, order_id, orders:order_id(order_no, item_name, due_date, customer_id), work_stations:station_id(name, color), employees:assignee_id(name), vendors:vendor_id(name)",
         )
+        .or(`status.not.in.(done,skipped),updated_at.gte.${new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()}`)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as unknown as BoardTask[];
