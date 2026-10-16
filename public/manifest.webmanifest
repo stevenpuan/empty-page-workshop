@@ -1,0 +1,27 @@
+{
+  "name": "祥興沂融營運系統",
+  "short_name": "打卡",
+  "description": "祥興印刷／沂融企業社 員工打卡與營運系統",
+  "lang": "zh-Hant-TW",
+  "id": "/clock",
+  "start_url": "/clock",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#06b6d4",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
