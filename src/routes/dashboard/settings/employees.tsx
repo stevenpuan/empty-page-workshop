@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Copy, KeyRound, UserPlus, ShieldCheck } from "lucide-react";
+import { Copy, KeyRound, UserPlus, ShieldCheck, RefreshCw, Unlink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useLookup } from "@/lib/lookups";
@@ -78,13 +78,24 @@ interface Emp {
 }
 type Draft = Partial<Emp>;
 
+/** LINE 綁定狀態（get_line_bind_status：主管看全公司，其他人只看自己；綁定碼不開放一般查詢） */
+interface LineBind {
+  employee_id: string;
+  line_bind_code: string | null;
+  is_bound: boolean;
+  line_bind_at: string | null;
+}
+
+/** employees 不可用 select("*")：line_bind_code 欄位已對一般角色關閉 */
+const EMP_COLUMNS =
+  "id, company_id, user_id, emp_no, name, role_id, position, phone, line_user_id, shift_id, hire_date, can_switch_company, is_active, note, roles(code, name, tier)";
+
 const blank = (): Draft => ({
   emp_no: "",
   name: "",
   role_id: "",
   position: "",
   phone: "",
-  line_user_id: "",
   shift_id: null,
   hire_date: null,
   can_switch_company: false,
@@ -93,7 +104,7 @@ const blank = (): Draft => ({
 });
 
 function Page() {
-  const { can, isOwner, company, employee: me } = useAuth();
+  const { can, isOwner, isManager, company, employee: me } = useAuth();
   const qc = useQueryClient();
   const canEdit = can("employees", "edit");
   const positions = useLookup("position", { includeInactive: true });
@@ -108,13 +119,23 @@ function Page() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employees")
-        .select("*, roles(code, name, tier)")
+        .select(EMP_COLUMNS)
         .order("is_active", { ascending: false })
         .order("emp_no");
       if (error) throw error;
-      return data as Emp[];
+      return data as unknown as Emp[];
     },
   });
+  const { data: lineBinds = [] } = useQuery({
+    queryKey: ["line_bind_status", company?.id],
+    enabled: !!company?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_line_bind_status");
+      if (error) throw error;
+      return (data ?? []) as LineBind[];
+    },
+  });
+  const bindOf = (id: string) => lineBinds.find((b) => b.employee_id === id);
   const { data: roles = [] } = useQuery({
     queryKey: ["roles", company?.id],
     enabled: !!company?.id,
@@ -140,7 +161,10 @@ function Page() {
       return data as Shift[];
     },
   });
-  const reload = () => qc.invalidateQueries({ queryKey: ["employees", company?.id] });
+  const reload = () => {
+    void qc.invalidateQueries({ queryKey: ["employees", company?.id] });
+    void qc.invalidateQueries({ queryKey: ["line_bind_status", company?.id] });
+  };
 
   // ---- 新增／編輯 ----
   const [form, setForm] = useState<Draft | null>(null);
@@ -155,6 +179,7 @@ function Page() {
       toast.error("員工編號只能用英數字與 . _ -（會成為登入帳號）");
       return;
     }
+    // LINE 綁定只能由員工傳綁定碼完成，這裡不寫 line_user_id
     const payload = {
       company_id: company.id,
       emp_no: form.emp_no.trim(),
@@ -162,7 +187,6 @@ function Page() {
       role_id: form.role_id,
       position: form.position || null,
       phone: form.phone || null,
-      line_user_id: form.line_user_id?.trim() || null,
       shift_id: form.shift_id || null,
       hire_date: form.hire_date || null,
       can_switch_company: !!form.can_switch_company,
@@ -253,13 +277,51 @@ function Page() {
     }
   };
 
+  // ---- LINE 綁定 ----
+  const copyBindMessage = (e: Emp, code: string) =>
+    copy(
+      `${e.name} 您好，請用 LINE 加入公司官方帳號好友，並傳送以下 6 碼綁定碼完成綁定：\n${code}\n綁定後系統通知會推播到您的 LINE。`,
+    );
+  const refreshCode = async (e: Emp) => {
+    const bound = bindOf(e.id)?.is_bound;
+    if (
+      !confirm(
+        bound
+          ? `要為「${e.name}」重新產生綁定碼嗎？\n目前的 LINE 綁定會被解除，需用新碼重新綁定（例如換手機）。`
+          : `要為「${e.name}」重新產生綁定碼嗎？舊的碼會失效。`,
+      )
+    )
+      return;
+    setBusyId(e.id);
+    const { data, error } = await supabase.rpc("refresh_line_bind_code", { p_employee_id: e.id });
+    setBusyId(null);
+    if (error) {
+      toast.error(humanizeError(error, "重新產生綁定碼"));
+      return;
+    }
+    toast.success(`新綁定碼：${String(data ?? "")}`);
+    reload();
+  };
+  const unbindLine = async (e: Emp) => {
+    if (!confirm(`要解除「${e.name}」的 LINE 綁定嗎？解除後不會再收到 LINE 推播。`)) return;
+    setBusyId(e.id);
+    const { error } = await supabase.rpc("unbind_line_account", { p_employee_id: e.id });
+    setBusyId(null);
+    if (error) {
+      toast.error(humanizeError(error, "解除 LINE 綁定"));
+      return;
+    }
+    toast.success("已解除 LINE 綁定");
+    reload();
+  };
+
   const roleOptions = roles.filter((r) => r.is_active && (isOwner || r.tier !== "owner"));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="員工與帳號"
-        description={`${company?.name ?? ""}的員工名冊、角色、LINE 綁定與登入帳號。角色決定功能權限；帳號由老闆建立，員工不能自行註冊。`}
+        description={`${company?.name ?? ""}的員工名冊、角色、LINE 綁定與登入帳號。角色決定功能權限；帳號由老闆建立，員工不能自行註冊。LINE 綁定：把綁定碼交給員工，員工加官方帳號好友後傳送綁定碼即可。`}
         actions={
           canEdit ? (
             <Button onClick={() => setForm(blank())}>
@@ -280,7 +342,7 @@ function Page() {
                 <TableHead>角色</TableHead>
                 <TableHead>職稱</TableHead>
                 <TableHead>電話</TableHead>
-                <TableHead>LINE</TableHead>
+                <TableHead>LINE 綁定</TableHead>
                 <TableHead>帳號</TableHead>
                 <TableHead>狀態</TableHead>
                 <TableHead>到職</TableHead>
@@ -302,77 +364,127 @@ function Page() {
                   </TableCell>
                 </TableRow>
               )}
-              {rows.map((e) => (
-                <TableRow key={e.id} className={!e.is_active ? "opacity-60" : ""}>
-                  <TableCell className="font-mono text-sm">{e.emp_no}</TableCell>
-                  <TableCell className="font-medium">
-                    {e.name}
-                    {e.id === me?.id && (
-                      <span className="ml-1 text-xs text-muted-foreground">（我）</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={e.roles?.tier === "owner" ? "default" : "outline"}>
-                      {e.roles?.name ?? "—"}
-                    </Badge>
-                    {e.can_switch_company && (
-                      <ShieldCheck
-                        className="inline w-3.5 h-3.5 ml-1 text-muted-foreground"
-                        aria-label="可切換公司"
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>{positions.labelOf(e.position)}</TableCell>
-                  <TableCell className="text-sm">{e.phone ?? "—"}</TableCell>
-                  <TableCell>
-                    {e.line_user_id ? (
-                      <Badge variant="outline" className="text-green-700 border-green-300">
-                        已綁
+              {rows.map((e) => {
+                const lb = bindOf(e.id);
+                const bound = lb ? lb.is_bound : !!e.line_user_id;
+                return (
+                  <TableRow key={e.id} className={!e.is_active ? "opacity-60" : ""}>
+                    <TableCell className="font-mono text-sm">{e.emp_no}</TableCell>
+                    <TableCell className="font-medium">
+                      {e.name}
+                      {e.id === me?.id && (
+                        <span className="ml-1 text-xs text-muted-foreground">（我）</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={e.roles?.tier === "owner" ? "default" : "outline"}>
+                        {e.roles?.name ?? "—"}
                       </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">未綁</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {e.user_id ? (
-                      <Badge variant="outline">已開通</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">未開通</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={e.is_active ? "default" : "outline"}>
-                      {e.is_active ? "在職" : "停用"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {fmtDate(e.hire_date)}
-                  </TableCell>
-                  <TableCell className="text-right whitespace-nowrap space-x-1">
-                    {canEdit && (
-                      <Button size="sm" variant="outline" onClick={() => setForm({ ...e })}>
-                        編輯
-                      </Button>
-                    )}
-                    {canEdit && e.is_active && !e.user_id && (
-                      <Button size="sm" disabled={busyId === e.id} onClick={() => createAccount(e)}>
-                        {busyId === e.id ? "處理中…" : "建立帳號"}
-                      </Button>
-                    )}
-                    {canEdit && e.user_id && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busyId === e.id}
-                        onClick={() => resetPassword(e)}
-                      >
-                        <KeyRound className="w-3.5 h-3.5 mr-1" />
-                        重設密碼
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                      {e.can_switch_company && (
+                        <ShieldCheck
+                          className="inline w-3.5 h-3.5 ml-1 text-muted-foreground"
+                          aria-label="可切換公司"
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>{positions.labelOf(e.position)}</TableCell>
+                    <TableCell className="text-sm">{e.phone ?? "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        {bound ? (
+                          <Badge
+                            variant="outline"
+                            className="text-green-700 border-green-300"
+                            title={lb?.line_bind_at ? `綁定於 ${fmtDate(lb.line_bind_at)}` : undefined}
+                          >
+                            已綁定
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">未綁定</span>
+                        )}
+                        {lb?.line_bind_code && (
+                          <>
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono tracking-wider">
+                              {lb.line_bind_code}
+                            </code>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              title="複製綁定說明（可直接貼到 LINE 給員工）"
+                              onClick={() => copyBindMessage(e, lb.line_bind_code!)}
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
+                        {isManager && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            title="重新產生綁定碼（換手機時使用）"
+                            disabled={busyId === e.id}
+                            onClick={() => refreshCode(e)}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {isManager && bound && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            title="解除 LINE 綁定"
+                            disabled={busyId === e.id}
+                            onClick={() => unbindLine(e)}
+                          >
+                            <Unlink className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {e.user_id ? (
+                        <Badge variant="outline">已開通</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">未開通</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={e.is_active ? "default" : "outline"}>
+                        {e.is_active ? "在職" : "停用"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {fmtDate(e.hire_date)}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap space-x-1">
+                      {canEdit && (
+                        <Button size="sm" variant="outline" onClick={() => setForm({ ...e })}>
+                          編輯
+                        </Button>
+                      )}
+                      {canEdit && e.is_active && !e.user_id && (
+                        <Button size="sm" disabled={busyId === e.id} onClick={() => createAccount(e)}>
+                          {busyId === e.id ? "處理中…" : "建立帳號"}
+                        </Button>
+                      )}
+                      {canEdit && e.user_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === e.id}
+                          onClick={() => resetPassword(e)}
+                        >
+                          <KeyRound className="w-3.5 h-3.5 mr-1" />
+                          重設密碼
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -385,7 +497,7 @@ function Page() {
             <DialogTitle>{isNew ? "新增員工" : "編輯員工"}</DialogTitle>
             <DialogDescription>
               {isNew
-                ? "先建立員工資料，再按「建立帳號」開通登入。"
+                ? "先建立員工資料，再按「建立帳號」開通登入。LINE 綁定碼會自動產生。"
                 : "角色與帳號變更會寫入稽核日誌。"}
             </DialogDescription>
           </DialogHeader>
@@ -491,14 +603,6 @@ function Page() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>LINE User ID</Label>
-                  <Input
-                    value={form.line_user_id ?? ""}
-                    onChange={(e) => setForm({ ...form, line_user_id: e.target.value })}
-                    placeholder="U 開頭 33 碼"
-                  />
                 </div>
               </div>
               <div className="space-y-1">
