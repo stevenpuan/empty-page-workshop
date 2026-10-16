@@ -7,6 +7,7 @@ import { humanizeError } from "@/lib/app-error";
 import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { JobCard, type BoardTask } from "@/components/JobCard";
 import { Badge } from "@/components/ui/badge";
+import { RequirePerm } from "@/components/RequirePerm";
 
 export const Route = createFileRoute("/dashboard/board/tv")({
   head: () => ({
@@ -35,10 +36,13 @@ const COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ["outsourced", "外包中"],
 ];
 
+/**
+ * 外層：先處理 ?company= 切換公司，再進權限守門。
+ * （守門放在切換之後：目前公司沒有看板權限、但指定公司有時，仍能切過去顯示）
+ */
 function TvPage() {
   const { company, companies, permsLoaded, switchCompany } = useAuth();
   const { company: companyParam } = Route.useSearch();
-  useBoardRealtime();
 
   // ?company=XX 固定公司（避免誤切）：id 或 code 都可
   const switched = useRef(false);
@@ -50,6 +54,17 @@ function TvPage() {
       void switchCompany(target.id).catch(() => {});
     }
   }, [companyParam, permsLoaded, companies, company?.id, switchCompany]);
+
+  return (
+    <RequirePerm module="board">
+      <TvBoard />
+    </RequirePerm>
+  );
+}
+
+function TvBoard() {
+  const { company } = useAuth();
+  useBoardRealtime();
 
   // 電視一律深色：掛載期間把整個文件切到 dark theme
   useEffect(() => {

@@ -85,10 +85,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "訂單派工、應收應付、出勤打卡、LINE 主動提醒" },
       { property: "og:type", content: "website" },
       { name: "theme-color", content: "#06b6d4" },
+      // PWA：打卡頁可「加到主畫面」
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "打卡" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/icon.svg" },
     ],
   }),
   shellComponent: RootShell,
@@ -111,8 +118,28 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/** 只在瀏覽器、正式環境註冊 Service Worker（SSR 不會跑 useEffect；dev 不註冊以免快取干擾 HMR） */
+function useServiceWorker() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator) || !import.meta.env.PROD) return;
+    const register = () => {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.warn("Service Worker 註冊失敗", err);
+      });
+    };
+    if (document.readyState === "complete") {
+      register();
+      return;
+    }
+    window.addEventListener("load", register, { once: true });
+    return () => window.removeEventListener("load", register);
+  }, []);
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useServiceWorker();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

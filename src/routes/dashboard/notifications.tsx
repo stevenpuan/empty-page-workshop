@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bell, CheckCheck, Trash2 } from "lucide-react";
+import { Bell, CheckCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -34,7 +34,7 @@ const LINE_LABEL: Record<string, string> = {
 };
 
 function Page() {
-  const { employee } = useAuth();
+  const { employee, permsLoaded } = useAuth();
   const empId = employee?.id;
   const [items, setItems] = useState<Notif[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -72,34 +72,23 @@ function Page() {
     };
   }, [empId, load]);
 
+  // 通知只能透過 RPC 標已讀（DB 端只允許改 is_read／read_at），不直接 update／delete 資料表
   const markAll = async () => {
-    const { error } = await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("employee_id", empId)
-      .eq("is_read", false);
+    const { error } = await supabase.rpc("mark_all_notifications_read");
     if (error) {
-      toast.error(humanizeError(error, "標為已讀"));
+      toast.error(humanizeError(error, "全部標為已讀"));
       return;
     }
-    void load();
-  };
-  const clearRead = async () => {
-    if (!confirm("清除所有已讀通知？")) return;
-    const { error } = await supabase
-      .from("notifications")
-      .delete()
-      .eq("employee_id", empId)
-      .eq("is_read", true);
-    if (error) {
-      toast.error(humanizeError(error, "清除已讀"));
-      return;
-    }
+    setItems((xs) => xs.map((x) => ({ ...x, is_read: true })));
     void load();
   };
   const open = async (n: Notif) => {
     if (!n.is_read) {
-      await supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
+      const { error } = await supabase.rpc("mark_notification_read", { p_notification_id: n.id });
+      if (error) {
+        toast.error(humanizeError(error, "標為已讀"));
+        return;
+      }
       setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
     }
     // S3 起依 ref_type 導頁（order/task/payable…）
@@ -108,6 +97,8 @@ function Page() {
   const unread = items.filter((n) => !n.is_read).length;
   const shown = filter === "unread" ? items.filter((n) => !n.is_read) : items;
 
+  // 通知中心不綁模組（選單無 module_key，人人可見）；但仍等權限／員工資料載完再判斷
+  if (!permsLoaded) return <div className="text-muted-foreground py-8">載入中…</div>;
   if (!empId)
     return <p className="text-sm text-muted-foreground py-8">此帳號沒有員工身分，不會收到通知。</p>;
 
@@ -117,21 +108,10 @@ function Page() {
         title="通知中心"
         description={`共 ${items.length} 則・未讀 ${unread} 則`}
         actions={
-          <>
-            <Button variant="outline" size="sm" onClick={markAll} disabled={!unread}>
-              <CheckCheck className="w-4 h-4 mr-1" />
-              全部已讀
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearRead}
-              disabled={items.length === unread}
-            >
-              <Trash2 className="w-4 h-4 mr-1" />
-              清除已讀
-            </Button>
-          </>
+          <Button variant="outline" size="sm" onClick={markAll} disabled={!unread}>
+            <CheckCheck className="w-4 h-4 mr-1" />
+            全部已讀
+          </Button>
         }
       />
       {loadError && (

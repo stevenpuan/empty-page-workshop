@@ -2,7 +2,16 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { LogIn, LogOut, CheckCircle2, MapPin, Loader2, ClipboardEdit } from "lucide-react";
+import {
+  LogIn,
+  LogOut,
+  CheckCircle2,
+  MapPin,
+  Loader2,
+  ClipboardEdit,
+  Smartphone,
+  X,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -299,8 +308,107 @@ function ClockPage() {
             </Link>
           </Button>
         </div>
+
+        <InstallHint />
       </div>
     </div>
+  );
+}
+
+/** Android Chrome 的安裝事件（非標準型別） */
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+const INSTALL_HINT_KEY = "clock-install-hint-dismissed";
+
+/**
+ * 「加到主畫面」提示：只在瀏覽器分頁（非已安裝的 standalone）顯示；
+ * Android 有安裝事件時給按鈕，iOS 給 Safari 分享選單的步驟。
+ * 全部在 useEffect 決定是否顯示，SSR 一律不輸出，避免 hydration 不一致。
+ */
+function InstallHint() {
+  const [show, setShow] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (standalone) return;
+    let dismissed = false;
+    try {
+      dismissed = window.localStorage.getItem(INSTALL_HINT_KEY) === "1";
+    } catch {
+      /* 私密瀏覽等情況讀不到，當作沒關過 */
+    }
+    if (dismissed) return;
+    const ua = navigator.userAgent;
+    setIsIOS(/iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1));
+    setShow(true);
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => setShow(false);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  if (!show) return null;
+
+  const dismiss = () => {
+    setShow(false);
+    try {
+      window.localStorage.setItem(INSTALL_HINT_KEY, "1");
+    } catch {
+      /* 寫不進去就只關這一次 */
+    }
+  };
+  const install = async () => {
+    if (!deferred) return;
+    await deferred.prompt();
+    const { outcome } = await deferred.userChoice;
+    setDeferred(null);
+    if (outcome === "accepted") setShow(false);
+  };
+
+  return (
+    <Card className="border-dashed">
+      <CardContent className="p-4 flex gap-3 text-sm">
+        <Smartphone className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+        <div className="flex-1 space-y-2">
+          <p className="font-medium">把打卡加到手機主畫面</p>
+          {deferred ? (
+            <Button size="sm" onClick={() => void install()}>
+              加到主畫面
+            </Button>
+          ) : isIOS ? (
+            <p className="text-muted-foreground">
+              用 Safari 開啟本頁，點下方「分享」按鈕，選「加入主畫面」。
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              在瀏覽器選單（右上角 ⋮）選「加到主畫面」或「安裝應用程式」，之後一點就能打卡。
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="self-start text-muted-foreground hover:text-foreground"
+          aria-label="不再顯示"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </CardContent>
+    </Card>
   );
 }
 
