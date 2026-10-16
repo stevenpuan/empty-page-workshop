@@ -98,7 +98,7 @@ const AUTH_CODE_MESSAGES: Readonly<Record<string, string>> = {
 
 const NETWORK_HINT =
   /Failed to fetch|NetworkError|network ?error|ERR_NETWORK|ERR_INTERNET_DISCONNECTED|Load failed|fetch failed/i;
-const HAS_CJK = /[㐀-䶿一-鿿豈-﫿]/;
+const HAS_CJK = /[㐀-䶿一-鿿豈-﫿]/;
 const LOOKS_LIKE_CONSTRAINT = /constraint|violat/i;
 /** 後端 raise 的錯誤有時把代碼黏在訊息前面：「P0002: 還有未完成的工序，不能出貨」 */
 const RAISE_CODE_PREFIX = /^P\d{4}:\s*/;

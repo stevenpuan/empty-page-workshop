@@ -326,8 +326,8 @@ function Page() {
                     placeholder="XX"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    對應 Secret <code>LINE_CHANNEL_TOKEN_{form.line_channel_key || "XX"}</code>
-                    ，token 本身不存資料庫
+                    兩家公司共用同一個 LINE 官方帳號（token 存在 Supabase Secret{" "}
+                    <code>LINE_CHANNEL_TOKEN</code>，不存資料庫）；此鍵值僅用來識別公司
                   </p>
                 </div>
               </div>

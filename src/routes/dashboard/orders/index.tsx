@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -146,6 +146,7 @@ const blank = (): OrderDraft => ({
 function Page() {
   const { can, company } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const canCreate = can("orders", "create");
   const canEdit = can("orders", "edit");
 
@@ -366,8 +367,23 @@ function Page() {
                 </TableRow>
               )}
               {rows.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-mono text-sm">{o.order_no}</TableCell>
+                <TableRow
+                  key={o.id}
+                  className="cursor-pointer"
+                  onClick={() =>
+                    navigate({ to: "/dashboard/orders/$orderId", params: { orderId: o.id } })
+                  }
+                >
+                  <TableCell className="font-mono text-sm">
+                    <Link
+                      to="/dashboard/orders/$orderId"
+                      params={{ orderId: o.id }}
+                      className="text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {o.order_no}
+                    </Link>
+                  </TableCell>
                   <TableCell className="font-medium">{o.customers?.name ?? "—"}</TableCell>
                   <TableCell className="text-sm">{o.item_name}</TableCell>
                   <TableCell className="text-sm max-w-[200px] truncate">{o.spec ?? "—"}</TableCell>
@@ -387,7 +403,8 @@ function Page() {
                       {statusLabel(o.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  {/* 操作選單不觸發整列跳轉（Radix portal 的事件仍會沿 React 樹冒泡到這裡） */}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     {canEdit && (o.status === "draft" || o.status === "active") && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
