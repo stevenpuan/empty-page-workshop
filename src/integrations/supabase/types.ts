@@ -833,6 +833,111 @@ export type Database = {
           },
         ]
       }
+      delivery_notes: {
+        Row: {
+          address: string | null
+          amount_total: number
+          amount_untaxed: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          delivery_date: string
+          delivery_no: string
+          id: string
+          note: string | null
+          order_id: string
+          qty: number | null
+          receivable_id: string | null
+          receiver: string | null
+          status: string
+          tax_amount: number
+          unit: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address?: string | null
+          amount_total?: number
+          amount_untaxed?: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          delivery_date?: string
+          delivery_no: string
+          id?: string
+          note?: string | null
+          order_id: string
+          qty?: number | null
+          receivable_id?: string | null
+          receiver?: string | null
+          status?: string
+          tax_amount?: number
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address?: string | null
+          amount_total?: number
+          amount_untaxed?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          delivery_date?: string
+          delivery_no?: string
+          id?: string
+          note?: string | null
+          order_id?: string
+          qty?: number | null
+          receivable_id?: string | null
+          receiver?: string | null
+          status?: string
+          tax_amount?: number
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           code: string | null
@@ -1070,6 +1175,185 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holidays: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          holiday_date: string
+          id: string
+          is_confirmed: boolean
+          kind: string
+          name: string
+          note: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          holiday_date: string
+          id?: string
+          is_confirmed?: boolean
+          kind?: string
+          name: string
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          holiday_date?: string
+          id?: string
+          is_confirmed?: boolean
+          kind?: string
+          name?: string
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holidays_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          avg_cost: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          item_code: string | null
+          name: string
+          note: string | null
+          qty_on_hand: number
+          safety_qty: number
+          spec: string
+          unit: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          avg_cost?: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          item_code?: string | null
+          name: string
+          note?: string | null
+          qty_on_hand?: number
+          safety_qty?: number
+          spec?: string
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          avg_cost?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          item_code?: string | null
+          name?: string
+          note?: string | null
+          qty_on_hand?: number
+          safety_qty?: number
+          spec?: string
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_moves: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          move_type: string
+          note: string | null
+          order_id: string | null
+          qty: number
+          source_id: string | null
+          source_type: string
+          unit_cost: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          move_type: string
+          note?: string | null
+          order_id?: string | null
+          qty: number
+          source_id?: string | null
+          source_type: string
+          unit_cost?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          move_type?: string
+          note?: string | null
+          order_id?: string | null
+          qty?: number
+          source_id?: string | null
+          source_type?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_moves_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_moves_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_moves_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -2270,6 +2554,7 @@ export type Database = {
           customer_id: string
           id: string
           note: string | null
+          order_id: string | null
           quote_date: string
           quote_no: string
           status: string
@@ -2288,6 +2573,7 @@ export type Database = {
           customer_id: string
           id?: string
           note?: string | null
+          order_id?: string | null
           quote_date?: string
           quote_no: string
           status?: string
@@ -2306,6 +2592,7 @@ export type Database = {
           customer_id?: string
           id?: string
           note?: string | null
+          order_id?: string | null
           quote_date?: string
           quote_no?: string
           status?: string
@@ -2330,6 +2617,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -3226,6 +3520,20 @@ export type Database = {
       }
     }
     Functions: {
+      add_order_cost: {
+        Args: {
+          p_amount: number
+          p_cost_type: string
+          p_note?: string
+          p_order_id: string
+          p_recognized_at?: string
+        }
+        Returns: Json
+      }
+      adjust_outsource_amount: {
+        Args: { p_amount: number; p_link_id: string; p_reason?: string }
+        Returns: Json
+      }
       allocate_collection: {
         Args: {
           p_allocations: Json
@@ -3283,6 +3591,29 @@ export type Database = {
       complete_outsource: { Args: { p_link_id: string }; Returns: Json }
       complete_password_change: { Args: never; Returns: undefined }
       confirm_purchase: { Args: { p_purchase_id: string }; Returns: Json }
+      convert_quotation_to_order: {
+        Args: { p_due_date?: string; p_quotation_id: string }
+        Returns: Json
+      }
+      create_delivery_note: {
+        Args: {
+          p_address?: string
+          p_delivery_date?: string
+          p_note?: string
+          p_order_id: string
+          p_receiver?: string
+        }
+        Returns: Json
+      }
+      create_outsource_purchase: {
+        Args: {
+          p_amount: number
+          p_note?: string
+          p_task_id: string
+          p_vendor_id: string
+        }
+        Returns: Json
+      }
       cron_guarded: { Args: { p_fn: string }; Returns: undefined }
       current_company_id: { Args: never; Returns: string }
       current_employee_id: { Args: never; Returns: string }
@@ -3316,6 +3647,35 @@ export type Database = {
       find_user_id_by_email: { Args: { p_email: string }; Returns: string }
       generate_line_bind_code: { Args: never; Returns: string }
       get_config: { Args: { p_key: string }; Returns: string }
+      get_line_bind_status: {
+        Args: never
+        Returns: {
+          employee_id: string
+          is_bound: boolean
+          line_bind_at: string
+          line_bind_code: string
+        }[]
+      }
+      group_kpis: {
+        Args: never
+        Returns: {
+          active_employees: number
+          ap_balance: number
+          ar_balance: number
+          company_code: string
+          company_id: string
+          company_name: string
+          month_order_amount: number
+          month_orders: number
+          month_shipped_amount: number
+          outsourcing: number
+          overdue_tasks: number
+          today_abnormal: number
+          today_clock_in: number
+          today_new_orders: number
+          wip_orders: number
+        }[]
+      }
       has_perm: {
         Args: { p_action: string; p_module: string }
         Returns: boolean
@@ -3323,6 +3683,31 @@ export type Database = {
       haversine_m: {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
+      }
+      inventory_adjust: {
+        Args: { p_actual_qty: number; p_item_id: string; p_note?: string }
+        Returns: Json
+      }
+      inventory_create_item: {
+        Args: {
+          p_item_code?: string
+          p_name: string
+          p_qty?: number
+          p_safety_qty?: number
+          p_spec?: string
+          p_unit?: string
+          p_unit_cost?: number
+        }
+        Returns: Json
+      }
+      inventory_issue: {
+        Args: {
+          p_item_id: string
+          p_note?: string
+          p_order_id?: string
+          p_qty: number
+        }
+        Returns: Json
       }
       is_manager: { Args: never; Returns: boolean }
       is_owner: { Args: never; Returns: boolean }
@@ -3371,6 +3756,14 @@ export type Database = {
       }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
       send_line_digests: { Args: never; Returns: number }
+      set_order_status: {
+        Args: { p_order_id: string; p_status: string }
+        Returns: Json
+      }
+      set_quotation_status: {
+        Args: { p_quotation_id: string; p_status: string }
+        Returns: Json
+      }
       switch_company: { Args: { p_company_id: string }; Returns: undefined }
       task_assign: {
         Args: { p_assignee_id: string; p_task_id: string }
@@ -3399,7 +3792,12 @@ export type Database = {
         Returns: undefined
       }
       user_company_ids: { Args: never; Returns: string[] }
+      verify_internal_push_key: { Args: { p_key: string }; Returns: boolean }
       void_collection: { Args: { p_collection_id: string }; Returns: Json }
+      void_delivery_note: {
+        Args: { p_delivery_id: string; p_reason?: string }
+        Returns: Json
+      }
       void_payment: { Args: { p_payment_id: string }; Returns: Json }
       void_purchase: { Args: { p_purchase_id: string }; Returns: Json }
       write_audit: {

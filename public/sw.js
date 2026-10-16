@@ -3,9 +3,9 @@
  * - 只處理同源 GET；Supabase API、非 GET 一律不攔截、不快取
  * - 不快取 JS/CSS bundle（避免部署後卡舊版）
  */
-const CACHE = "xx-yr-shell-v1";
+const CACHE = "xx-yr-shell-v2";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/icons/icon.svg", "/manifest.webmanifest"];
+const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
