@@ -18,7 +18,6 @@ import { ChevronDown, ChevronRight, Monitor, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
-import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { RequirePerm } from "@/components/RequirePerm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { JobCard, type BoardTask } from "@/components/JobCard";
@@ -121,7 +120,6 @@ function Page() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const canDrag = isManager;
-  useBoardRealtime();
 
   const [collapsed, setCollapsed] = useState<string[]>(COLLAPSED_BY_DEFAULT);
   const [stationFilter, setStationFilter] = useState<string[]>(EMPTY_STATIONS);
@@ -184,15 +182,35 @@ function Page() {
   });
 
   // Realtime：任何人推進工序，其他螢幕跟著更新
+  // 伺服器端以 company_id 過濾；channel 名稱加亂數尾碼，避免 StrictMode 重複掛載共用同一 channel；
+  // 一連串工序更新以 300ms debounce 合併成一次重新查詢。
   useEffect(() => {
-    if (!company?.id) return;
+    const companyId = company?.id;
+    if (!companyId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const suffix = Math.random().toString(36).slice(2, 10);
     const ch = supabase
-      .channel(`board-${company.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_tasks" }, () => {
-        void qc.invalidateQueries({ queryKey: ["order_tasks_board", company.id] });
-      })
+      .channel(`board-${companyId}-${suffix}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_tasks",
+          filter: `company_id=eq.${companyId}`,
+        },
+        () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            timer = null;
+            void qc.invalidateQueries({ queryKey: ["order_tasks_board", companyId] });
+          }, 300);
+        },
+      )
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
       void supabase.removeChannel(ch);
     };
   }, [company?.id, qc]);

@@ -48,7 +48,7 @@ export const Route = createFileRoute("/dashboard/settings/stations")({
     ],
   }),
   component: () => (
-    <RequirePerm module="work_stations">
+    <RequirePerm module="stations">
       <Page />
     </RequirePerm>
   ),
@@ -126,9 +126,9 @@ const blankStep = (nextNo: number): StepDraft => ({
 function Page() {
   const { can, company } = useAuth();
   const qc = useQueryClient();
-  const canCreate = can("work_stations", "create");
-  const canEdit = can("work_stations", "edit");
-  const canDelete = can("work_stations", "delete");
+  const canCreate = can("stations", "create");
+  const canEdit = can("stations", "edit");
+  const canDelete = can("stations", "delete");
 
   // ---------- 站別 ----------
   const {

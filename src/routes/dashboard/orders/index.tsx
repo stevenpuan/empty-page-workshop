@@ -220,6 +220,12 @@ function Page() {
 
   // ---- 新增 ----
   const [form, setForm] = useState<OrderDraft | null>(null);
+  // 稅額預設 5%：使用者手動改過稅額後就不再自動帶入（每次開啟對話框重置）
+  const [taxTouched, setTaxTouched] = useState(false);
+  const openNew = () => {
+    setTaxTouched(false);
+    setForm(blank());
+  };
   const setProduct = (id: string | null) => {
     if (!form) return;
     const p = products.find((x) => x.id === id);
@@ -302,7 +308,7 @@ function Page() {
         description="訂單列表：草稿可確認，確認後自動展開工序；草稿／進行中訂單可作廢（不可恢復）。"
         actions={
           canCreate ? (
-            <Button onClick={() => setForm(blank())}>
+            <Button onClick={openNew}>
               <FilePlus2 className="w-4 h-4 mr-1" />
               新增訂單
             </Button>
@@ -539,7 +545,16 @@ function Page() {
                   <Input
                     type="number"
                     value={form.amount_untaxed}
-                    onChange={(e) => setForm({ ...form, amount_untaxed: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const untaxed = Number(e.target.value);
+                      setForm({
+                        ...form,
+                        amount_untaxed: untaxed,
+                        tax_amount: taxTouched
+                          ? form.tax_amount
+                          : Math.round((Number.isFinite(untaxed) ? untaxed : 0) * 0.05),
+                      });
+                    }}
                   />
                 </div>
                 <div className="space-y-1">
@@ -547,8 +562,12 @@ function Page() {
                   <Input
                     type="number"
                     value={form.tax_amount}
-                    onChange={(e) => setForm({ ...form, tax_amount: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setTaxTouched(true);
+                      setForm({ ...form, tax_amount: Number(e.target.value) });
+                    }}
                   />
+                  <p className="text-xs text-muted-foreground">預設 5%，可手動修改（免稅填 0）</p>
                 </div>
                 <div className="space-y-1">
                   <Label>含稅總額</Label>

@@ -141,7 +141,9 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("menus")
-        .select("*")
+        .select(
+          "id, menu_key, parent_id, title, icon, route, module_key, min_tier, sort_order, is_active",
+        )
         .eq("is_active", true)
         .order("sort_order");
       if (error) throw error;
@@ -159,10 +161,9 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
     return true;
   };
 
-  // 補充選單（menus 表尚未收錄的新頁面）：外包追蹤、集團總覽
-  const canOutsource = moduleEnabled("outsource") && can("outsource", "view");
+  // 集團對帳：金額不一致筆數，掛在 route = /dashboard/group 的選單項上
+  const GROUP_ROUTE = "/dashboard/group";
   const canGroup = moduleEnabled("group_overview") && can("group_overview", "view");
-  const knownRoutes = new Set(menus.map((m) => m.route));
 
   const { data: mismatchCount = 0 } = useQuery({
     queryKey: ["group_mismatch_count"],
@@ -177,197 +178,15 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
       return count ?? 0;
     },
   });
-
-  const extraItems = [
-    canOutsource && !knownRoutes.has("/dashboard/outsource")
-      ? { title: "外包追蹤", route: "/dashboard/outsource", icon: "ExternalLink", badge: 0 }
-      : null,
-    canGroup && !knownRoutes.has("/dashboard/group")
-      ? { title: "集團總覽", route: "/dashboard/group", icon: "Building2", badge: mismatchCount }
-      : null,
-  ].filter((x): x is { title: string; route: string; icon: string; badge: number } => !!x);
-
-  // 採購與應付（grp_ap）：menus 尚未收錄時由前端補齊，確保三項集中在同一群組。
-  // 資料來源仍以資料庫為準；這裡只補「資料庫沒有的那幾項」，不覆寫已有資料。
-  const AP_GROUP = "grp_ap";
-  const AP_ITEMS: MenuRow[] = [
-    {
-      id: "ap_vendors",
-      menu_key: "vendors",
-      parent_id: AP_GROUP,
-      title: "廠商",
-      icon: "Store",
-      route: "/dashboard/vendors",
-      module_key: "vendors",
-      min_tier: null,
-      sort_order: 10,
-      is_active: true,
-    },
-    {
-      id: "ap_purchases",
-      menu_key: "purchases",
-      parent_id: AP_GROUP,
-      title: "進貨單",
-      icon: "ShoppingCart",
-      route: "/dashboard/purchases",
-      module_key: "purchases",
-      min_tier: null,
-      sort_order: 20,
-      is_active: true,
-    },
-    {
-      id: "ap_payables",
-      menu_key: "payables",
-      parent_id: AP_GROUP,
-      title: "應付與付款",
-      icon: "Banknote",
-      route: "/dashboard/payables",
-      module_key: "payables",
-      min_tier: null,
-      sort_order: 30,
-      is_active: true,
-    },
-  ];
-  const isApGroup = (g: MenuRow) => g.menu_key === AP_GROUP || g.title === "採購與應付";
-  const hasApGroup = groups.some(isApGroup);
-  const syntheticApGroup: MenuRow | null = hasApGroup
-    ? null
-    : {
-        id: "grp_ap_synthetic",
-        menu_key: AP_GROUP,
-        parent_id: null,
-        title: "採購與應付",
-        icon: "Truck",
-        route: null,
-        module_key: null,
-        min_tier: null,
-        sort_order: 30,
-        is_active: true,
-      };
-
-  // 出勤群組（grp_attendance）：menus 尚未收錄時由前端補齊；打卡全角色可見，出勤管理限 manager 以上
-  const ATT_GROUP = "grp_attendance";
-  const ATT_ITEMS: MenuRow[] = [
-    {
-      id: "att_clock",
-      menu_key: "clock",
-      parent_id: ATT_GROUP,
-      title: "打卡",
-      icon: "Clock",
-      route: "/clock",
-      module_key: null,
-      min_tier: null,
-      sort_order: 10,
-      is_active: true,
-    },
-    {
-      id: "att_manage",
-      menu_key: "attendance",
-      parent_id: ATT_GROUP,
-      title: "出勤管理",
-      icon: "CalendarCheck",
-      route: "/attendance",
-      module_key: null,
-      min_tier: "manager",
-      sort_order: 20,
-      is_active: true,
-    },
-  ];
-  const isAttGroup = (g: MenuRow) => g.menu_key === ATT_GROUP || g.title === "出勤";
-  const hasAttMenu = menus.some((m) => m.route === "/clock" || m.route === "/attendance");
-  const syntheticAttGroup: MenuRow | null =
-    groups.some(isAttGroup) || hasAttMenu
-      ? null
-      : {
-          id: "grp_attendance_synthetic",
-          menu_key: ATT_GROUP,
-          parent_id: null,
-          title: "出勤",
-          icon: "Clock",
-          route: null,
-          module_key: null,
-          min_tier: null,
-          sort_order: 25,
-          is_active: true,
-        };
-
-  // 設定群組（grp_settings）：menus 尚未收錄時由前端補齊；通知規則限 manager 以上
-  const SET_GROUP = "grp_settings";
-  const SET_ITEMS: MenuRow[] = [
-    {
-      id: "set_rules",
-      menu_key: "notification_rules",
-      parent_id: SET_GROUP,
-      title: "通知規則",
-      icon: "Settings2",
-      route: "/dashboard/settings/rules",
-      module_key: "notification_rules",
-      min_tier: "manager",
-      sort_order: 40,
-      is_active: true,
-    },
-  ];
-  const isSetGroup = (g: MenuRow) =>
-    g.menu_key === SET_GROUP || g.title === "設定" || (g.menu_key ?? "").includes("setting");
-  const hasSetMenu = menus.some((m) => m.route === "/dashboard/settings/rules");
-  const syntheticSetGroup: MenuRow | null =
-    groups.some(isSetGroup) || hasSetMenu
-      ? null
-      : {
-          id: "grp_settings_synthetic",
-          menu_key: SET_GROUP,
-          parent_id: null,
-          title: "設定",
-          icon: "Settings",
-          route: null,
-          module_key: null,
-          min_tier: null,
-          sort_order: 900,
-          is_active: true,
-        };
-
-  // 插入位置：「設定」群組之前；找不到則附加在最後
-  const settingsIdx = groups.findIndex(
-    (g) => g.menu_key.includes("setting") || g.title === "設定",
-  );
-  let groupsBefore = settingsIdx >= 0 ? groups.slice(0, settingsIdx) : groups;
-  const groupsAfter = settingsIdx >= 0 ? groups.slice(settingsIdx) : [];
-  // 出勤群組放在「看板」之後；找不到看板則接在最後
-  if (syntheticAttGroup) {
-    const boardIdx = groupsBefore.findIndex(
-      (g) => g.route === "/dashboard/board" || g.menu_key === "board" || g.title === "派工看板",
-    );
-    const insertAt = boardIdx >= 0 ? boardIdx + 1 : groupsBefore.length;
-    groupsBefore = [
-      ...groupsBefore.slice(0, insertAt),
-      syntheticAttGroup,
-      ...groupsBefore.slice(insertAt),
-    ];
-  }
+  const badgeFor = (route: string | null) => (route === GROUP_ROUTE ? mismatchCount : undefined);
 
   const isOpen = (key: string, kids: MenuRow[]) =>
     key in openMap ? openMap[key] : kids.some((k) => k.route === pathname);
   const toggle = (key: string, kids: MenuRow[]) =>
     setOpenMap((prev) => ({ ...prev, [key]: !isOpen(key, kids) }));
 
-  // 群組內的項目：資料庫子選單（沿用同一個 visible 過濾）＋ 缺漏項補齊
-  const kidsFor = (g: MenuRow) => {
-    const dbKids = childrenOf(g.id).filter(visible);
-    const extras = isApGroup(g)
-      ? AP_ITEMS
-      : isAttGroup(g)
-        ? ATT_ITEMS
-        : isSetGroup(g)
-          ? SET_ITEMS
-          : null;
-    if (!extras) return dbKids;
-    const have = new Set(dbKids.map((k) => k.route));
-    const haveKey = new Set(dbKids.map((k) => k.menu_key));
-    const missing = extras.filter(
-      (k) => !have.has(k.route) && !haveKey.has(k.menu_key) && visible(k),
-    );
-    return [...dbKids, ...missing].sort((a, b) => a.sort_order - b.sort_order);
-  };
+  // 群組內的項目：完全由 menus 表決定（沿用同一個 visible 過濾）
+  const kidsFor = (g: MenuRow) => childrenOf(g.id).filter(visible);
 
   // 子路由前綴匹配（/clock/amendment 歸屬打卡、/attendance/* 歸屬出勤管理）
   const isRouteActive = (route: string | null) =>
@@ -384,6 +203,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
           title={g.title}
           active={pathname === g.route}
           onNavigate={onNavigate}
+          badge={badgeFor(g.route)}
         />
       );
     }
@@ -417,6 +237,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
                 title={k.title}
                 active={isRouteActive(k.route)}
                 onNavigate={onNavigate}
+                badge={badgeFor(k.route)}
                 indent
               />
             ))}
@@ -436,21 +257,7 @@ function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-[12px] text-muted-foreground">營運系統</p>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        {groupsBefore.map(renderGroup)}
-        {extraItems.map((item) => (
-          <SideLink
-            key={item.route}
-            to={item.route}
-            icon={item.icon}
-            title={item.title}
-            active={pathname === item.route}
-            onNavigate={onNavigate}
-            badge={item.badge}
-          />
-        ))}
-        {syntheticApGroup && renderGroup(syntheticApGroup)}
-        {groupsAfter.map(renderGroup)}
-        {syntheticSetGroup && renderGroup(syntheticSetGroup)}
+        {groups.map(renderGroup)}
       </nav>
       <div className="border-t p-3">
         <div className="flex items-center gap-2 px-2 py-1.5">
