@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, AlertTriangle, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -76,6 +76,7 @@ interface Payable {
   doc_no: string | null;
   vendor_id: string | null;
   vendor_name: string | null;
+  vendor_code: string | null;
   source_type: string | null;
   amount: number | null;
   paid_amount: number | null;
@@ -84,8 +85,38 @@ interface Payable {
   due_date: string | null;
   is_overdue: boolean | null;
   overdue_days: number | null;
+  invoice_no: string | null;
   purchase_id?: string | null;
   source_id?: string | null;
+}
+
+const PAYABLE_COLS =
+  "id, company_id, doc_no, vendor_id, source_type, amount, paid_amount, balance, status, due_date, invoice_no, purchase_id, vendor:vendors(name, vendor_code)";
+
+type PayableRow = Omit<Payable, "vendor_name" | "vendor_code" | "is_overdue" | "overdue_days"> & {
+  vendor?: { name: string; vendor_code: string | null } | null;
+};
+
+/** YYYY-MM-DD 字串相減的天數（皆為台北日期，用 UTC 計算避免時區偏移） */
+const daysBetween = (from: string, to: string) => {
+  const toUtc = (s: string) => {
+    const [y = 0, m = 1, d = 1] = s.slice(0, 10).split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((toUtc(to) - toUtc(from)) / 86400000);
+};
+
+/** payables 表 → 列表用資料（逾期以台北今天計算；payables_summary view 沒有 vendor_id，故直接查表） */
+function toPayable(r: PayableRow, today: string): Payable {
+  const open = r.status === "unpaid" || r.status === "partial";
+  const overdue = open && !!r.due_date && r.due_date < today;
+  return {
+    ...r,
+    vendor_name: r.vendor?.name ?? null,
+    vendor_code: r.vendor?.vendor_code ?? null,
+    is_overdue: overdue,
+    overdue_days: overdue && r.due_date ? daysBetween(r.due_date, today) : 0,
+  };
 }
 interface Payment {
   id: string;
@@ -178,7 +209,9 @@ function useVendors(companyId: string | undefined) {
 
 /* ---------------- Tab 1：應付管理 ---------------- */
 function PayablesTab() {
-  const { company } = useAuth();
+  const { company, can } = useAuth();
+  const canExport = can("payables", "export");
+  const [exporting, setExporting] = useState(false);
   const { data: vendors = [] } = useVendors(company?.id);
 
   const [statusFilter, setStatusFilter] = useState("all");
@@ -195,21 +228,99 @@ function PayablesTab() {
     enabled: !!company?.id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("payables_summary")
-        .select("*")
+        .from("payables")
+        .select(PAYABLE_COLS)
         .eq("company_id", company!.id)
         .order("due_date", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Payable[];
+      const today = taipeiToday();
+      return ((data ?? []) as unknown as PayableRow[]).map((r) => toPayable(r, today));
     },
   });
+
+  const exportExcel = async () => {
+    if (!company) return;
+    setExporting(true);
+    try {
+      const { data, error } = await supabase
+        .from("payables")
+        .select(PAYABLE_COLS)
+        .eq("company_id", company.id)
+        .in("status", ["unpaid", "partial"])
+        .order("due_date", { ascending: true });
+      if (error) throw error;
+      const today = taipeiToday();
+      const list = ((data ?? []) as unknown as PayableRow[]).map((r) => toPayable(r, today));
+      if (!list.length) {
+        toast.info("目前沒有未付清的應付帳款");
+        return;
+      }
+      const XLSX = await import("xlsx");
+      const header = [
+        "廠商代號",
+        "廠商",
+        "單號",
+        "來源",
+        "金額",
+        "已付",
+        "未付餘額",
+        "到期日",
+        "發票號碼",
+        "逾期天數",
+      ];
+      const aoa: (string | number)[][] = [header];
+      let sumAmount = 0;
+      let sumPaid = 0;
+      let sumBalance = 0;
+      for (const p of list) {
+        const amount = num(p.amount);
+        const paid = num(p.paid_amount);
+        const balance = p.balance === null ? amount - paid : num(p.balance);
+        sumAmount += amount;
+        sumPaid += paid;
+        sumBalance += balance;
+        aoa.push([
+          p.vendor_code ?? "",
+          p.vendor_name ?? "",
+          p.doc_no ?? "",
+          SOURCE_LABEL[p.source_type ?? ""] ?? p.source_type ?? "",
+          amount,
+          paid,
+          balance,
+          p.due_date ?? "",
+          p.invoice_no ?? "",
+          num(p.overdue_days),
+        ]);
+      }
+      aoa.push(["", "合計", `${list.length} 筆`, "", sumAmount, sumPaid, sumBalance, "", "", ""]);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 16 },
+        { wch: 8 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 10 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "應付未付");
+      XLSX.writeFile(wb, `應付未付清單_${today}.xlsx`);
+    } catch (e) {
+      toast.error(humanizeError(e, "匯出應付清單"));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const filtered = rows.filter(
     (r) =>
       (statusFilter === "all" || r.status === statusFilter) &&
       (vendorFilter === "all" || r.vendor_id === vendorFilter) &&
-      (overdueFilter === "all" ||
-        (overdueFilter === "yes" ? !!r.is_overdue : !r.is_overdue)),
+      (overdueFilter === "all" || (overdueFilter === "yes" ? !!r.is_overdue : !r.is_overdue)),
   );
 
   return (
@@ -256,6 +367,12 @@ function PayablesTab() {
             </SelectContent>
           </Select>
         </div>
+        {canExport && (
+          <Button variant="outline" className="ml-auto" onClick={exportExcel} disabled={exporting}>
+            <Download className="w-4 h-4 mr-1" />
+            {exporting ? "匯出中…" : "匯出 Excel"}
+          </Button>
+        )}
       </div>
 
       {loadErr && (
@@ -312,9 +429,7 @@ function PayablesTab() {
                     <TableCell className="text-sm">
                       {SOURCE_LABEL[p.source_type ?? ""] ?? p.source_type ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatTWD(p.amount)}
-                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{formatTWD(p.amount)}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatTWD(p.paid_amount)}
                     </TableCell>
@@ -357,21 +472,24 @@ function PayablesTab() {
 
 function PayableDetail({ payable }: { payable: Payable }) {
   const purchaseId = payable.purchase_id ?? payable.source_id ?? null;
+  const isPurchase = !!payable.purchase_id || payable.source_type === "purchase";
 
   const { data: purchase } = useQuery({
     queryKey: ["payable_purchase", purchaseId],
-    enabled: !!purchaseId && payable.source_type === "purchase",
+    enabled: !!purchaseId && isPurchase,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("id, purchase_no, purchase_date, total, status, items:purchase_items(item_name, qty, unit_price, amount)")
+        .select(
+          "id, purchase_no, purchase_date, amount_total, status, items:purchase_items(item_name, qty, unit_price, amount)",
+        )
         .eq("id", purchaseId!)
         .maybeSingle();
       if (error) throw error;
       return data as {
         purchase_no: string;
         purchase_date: string;
-        total: number;
+        amount_total: number;
         status: string;
         items: { item_name: string; qty: number; unit_price: number; amount: number }[];
       } | null;
@@ -407,7 +525,7 @@ function PayableDetail({ payable }: { payable: Payable }) {
           <div className="text-sm space-y-1">
             <p className="font-mono">
               {purchase.purchase_no} · {fmtDate(purchase.purchase_date)} ·{" "}
-              {formatTWD(purchase.total)}
+              {formatTWD(purchase.amount_total)}
             </p>
             <ul className="text-muted-foreground space-y-0.5">
               {(purchase.items ?? []).map((it, i) => (
@@ -618,9 +736,7 @@ function PaymentsTab() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>作廢付款 {voidTarget?.payment_no}</AlertDialogTitle>
-            <AlertDialogDescription>
-              作廢將反沖所有已沖帳金額，確定？
-            </AlertDialogDescription>
+            <AlertDialogDescription>作廢將反沖所有已沖帳金額，確定？</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
@@ -670,21 +786,19 @@ function PaymentDialog({
     enabled: !!company?.id && !!vendorId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("payables_summary")
-        .select("*")
+        .from("payables")
+        .select(PAYABLE_COLS)
         .eq("company_id", company!.id)
         .eq("vendor_id", vendorId)
         .in("status", ["unpaid", "partial"])
         .order("due_date", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Payable[];
+      const today = taipeiToday();
+      return ((data ?? []) as unknown as PayableRow[]).map((r) => toPayable(r, today));
     },
   });
 
-  const total = useMemo(
-    () => Object.values(alloc).reduce((s, v) => s + num(v), 0),
-    [alloc],
-  );
+  const total = useMemo(() => Object.values(alloc).reduce((s, v) => s + num(v), 0), [alloc]);
 
   const toggle = (p: Payable, checked: boolean) => {
     setAlloc((prev) => {

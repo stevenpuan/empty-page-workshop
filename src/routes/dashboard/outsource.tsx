@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ExternalLink, X } from "lucide-react";
+import { ChevronDown, ExternalLink, X, Pencil, PackagePlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -121,11 +121,13 @@ const ZERO_STATS: Stats = {
 };
 
 function Page() {
-  const { company, can } = useAuth();
+  const { company, can, isManager } = useAuth();
   const qc = useQueryClient();
   useBoardRealtime();
 
   const canCancel = can("outsource", "edit");
+  const [adjustTarget, setAdjustTarget] = useState<LinkRow | null>(null);
+  const [extOpen, setExtOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [vendorFilter, setVendorFilter] = useState<string>("all");
@@ -211,9 +213,7 @@ function Page() {
 
   const toggleStatus = (s: string) => {
     setPage(0);
-    setStatusFilter((prev) =>
-      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
-    );
+    setStatusFilter((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
   };
 
   const reload = () => {
@@ -223,7 +223,18 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="外包追蹤" description="追蹤所有外包出去的工序進度與金額" />
+      <PageHeader
+        title="外包追蹤"
+        description="追蹤所有外包出去的工序進度與金額"
+        actions={
+          isManager ? (
+            <Button variant="outline" onClick={() => setExtOpen(true)}>
+              <PackagePlus className="mr-1 h-4 w-4" />
+              外部廠商外包 → 建立進貨單
+            </Button>
+          ) : undefined
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -231,11 +242,7 @@ function Page() {
           value={String(stats.dispatched_count + stats.in_progress_count)}
           tone="text-blue-600"
         />
-        <StatCard
-          label="已完成"
-          value={String(stats.completed_count)}
-          tone="text-green-600"
-        />
+        <StatCard label="已完成" value={String(stats.completed_count)} tone="text-green-600" />
         <StatCard
           label="逾期"
           value={String(stats.overdue_count)}
@@ -409,9 +416,7 @@ function Page() {
                         </TableCell>
                         <TableCell>{l.vendor?.name ?? "—"}</TableCell>
                         <TableCell>{l.to_order?.order_no ?? "—"}</TableCell>
-                        <TableCell className="text-right">
-                          {formatTWD(l.agreed_amount)}
-                        </TableCell>
+                        <TableCell className="text-right">{formatTWD(l.agreed_amount)}</TableCell>
                         <TableCell
                           className={`whitespace-nowrap ${overdue ? "font-medium text-red-600" : ""}`}
                         >
@@ -424,13 +429,25 @@ function Page() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setExpanded(open ? null : l.id)}
-                          >
-                            詳情
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            {isManager && l.status !== "rejected" && l.status !== "cancelled" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAdjustTarget(l)}
+                              >
+                                <Pencil className="mr-1 h-3.5 w-3.5" />
+                                調整金額
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setExpanded(open ? null : l.id)}
+                            >
+                              詳情
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                       {open && (
@@ -478,11 +495,25 @@ function Page() {
         </div>
       </div>
 
-      <CancelDialog
-        link={cancelTarget}
-        onClose={() => setCancelTarget(null)}
-        onDone={reload}
+      <CancelDialog link={cancelTarget} onClose={() => setCancelTarget(null)} onDone={reload} />
+
+      <AdjustAmountDialog
+        key={adjustTarget?.id ?? "none"}
+        link={adjustTarget}
+        onClose={() => setAdjustTarget(null)}
+        onDone={() => {
+          reload();
+          void qc.invalidateQueries({ queryKey: ["cross_company_events"] });
+        }}
       />
+
+      {companyId && (
+        <ExternalPurchaseDialog
+          open={extOpen}
+          companyId={companyId}
+          onClose={() => setExtOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -542,9 +573,7 @@ function LinkDetail({
         )}
       </div>
 
-      {link.note && (
-        <p className="text-sm text-muted-foreground">備註：{link.note}</p>
-      )}
+      {link.note && <p className="text-sm text-muted-foreground">備註：{link.note}</p>}
 
       {eventsQ.isLoading ? (
         <p className="text-sm text-muted-foreground">載入中…</p>
@@ -633,6 +662,317 @@ function CancelDialog({
           </Button>
           <Button variant="destructive" onClick={submit} disabled={saving}>
             {saving ? "處理中…" : "確認取消"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AdjustAmountDialog({
+  link,
+  onClose,
+  onDone,
+}: {
+  link: LinkRow | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  // 以 key={link.id} 重新掛載，初始值帶入目前金額
+  const [amount, setAmount] = useState(
+    link?.agreed_amount === null || link?.agreed_amount === undefined
+      ? ""
+      : String(link.agreed_amount),
+  );
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const close = onClose;
+
+  const submit = async () => {
+    if (!link) return;
+    const n = Number(amount);
+    if (amount.trim() === "" || !Number.isFinite(n) || n < 0) {
+      toast.error("請輸入正確的金額");
+      return;
+    }
+    if (!reason.trim()) {
+      toast.error("請填寫調整原因");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc("adjust_outsource_amount", {
+        p_link_id: link.id,
+        p_amount: n,
+        p_reason: reason.trim(),
+      });
+      if (error) throw error;
+      const r = (Array.isArray(data) ? data[0] : data) as {
+        ok?: boolean;
+        old_amount?: number;
+        new_amount?: number;
+      } | null;
+      if (r && r.ok === false) throw new Error("調整未完成");
+      toast.success(
+        `已調整外包金額：${formatTWD(r?.old_amount ?? link.agreed_amount)} → ${formatTWD(r?.new_amount ?? n)}`,
+      );
+      onDone();
+      close();
+    } catch (err) {
+      toast.error(humanizeError(err, "調整外包金額"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!link} onOpenChange={(o) => !o && close()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>調整外包金額</DialogTitle>
+          <DialogDescription>
+            {`${link?.from_order?.order_no ?? ""} ${link?.vendor?.name ?? ""}・`}
+            尚未付款／收款時，會一併同步應付、對方應收與訂單成本。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground">
+            目前金額：{formatTWD(link?.agreed_amount ?? null)}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adjust-amount">新金額（未稅）</Label>
+            <Input
+              id="adjust-amount"
+              type="number"
+              min={0}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adjust-reason">調整原因 *</Label>
+            <Textarea
+              id="adjust-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="例如：追加數量、議價後調整"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={close} disabled={saving}>
+            返回
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? "處理中…" : "確認調整"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ActiveTask {
+  id: string;
+  step_no: number;
+  status: string;
+  orders: { order_no: string | null; item_name: string | null } | null;
+  work_stations: { name: string | null } | null;
+}
+
+const TASK_STATUS_LABEL: Record<string, string> = {
+  pending: "待派",
+  assigned: "已指派",
+  in_progress: "進行中",
+};
+
+function ExternalPurchaseDialog({
+  open,
+  companyId,
+  onClose,
+}: {
+  open: boolean;
+  companyId: string;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [taskId, setTaskId] = useState("");
+  const [vendorId, setVendorId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const tasksQ = useQuery({
+    queryKey: ["outsource_active_tasks", companyId],
+    enabled: open,
+    queryFn: async (): Promise<ActiveTask[]> => {
+      const { data, error } = await supabase
+        .from("order_tasks")
+        .select(
+          "id, step_no, status, orders:order_id(order_no, item_name), work_stations:station_id(name)",
+        )
+        .eq("company_id", companyId)
+        .in("status", ["pending", "assigned", "in_progress"])
+        .order("created_at", { ascending: false })
+        .range(0, 199);
+      if (error) throw error;
+      return (data ?? []) as unknown as ActiveTask[];
+    },
+  });
+
+  const vendorsQ = useQuery({
+    queryKey: ["external_vendors", companyId],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("id, name, vendor_code")
+        .eq("company_id", companyId)
+        .is("linked_company_id", null)
+        .eq("is_active", true)
+        .order("vendor_code");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string; vendor_code: string | null }[];
+    },
+  });
+
+  const reset = () => {
+    setTaskId("");
+    setVendorId("");
+    setAmount("");
+    setNote("");
+  };
+  const close = () => {
+    reset();
+    onClose();
+  };
+
+  const submit = async () => {
+    if (!taskId) {
+      toast.error("請選擇工序");
+      return;
+    }
+    if (!vendorId) {
+      toast.error("請選擇外部廠商");
+      return;
+    }
+    const n = Number(amount);
+    if (amount.trim() === "" || !Number.isFinite(n) || n <= 0) {
+      toast.error("請輸入正確的金額");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc("create_outsource_purchase", {
+        p_task_id: taskId,
+        p_vendor_id: vendorId,
+        p_amount: n,
+        p_note: note.trim() || null,
+      });
+      if (error) throw error;
+      const r = (Array.isArray(data) ? data[0] : data) as {
+        ok?: boolean;
+        purchase_id?: string;
+        purchase_no?: string;
+      } | null;
+      if (!r || r.ok === false) throw new Error("建立進貨單未完成");
+      toast.success(`已建立進貨單（草稿）${r.purchase_no ?? ""}`, {
+        description: "請至進貨單確認明細後再確認進貨。",
+        action: {
+          label: "前往進貨單",
+          onClick: () => void navigate({ to: "/dashboard/purchases" }),
+        },
+      });
+      void qc.invalidateQueries({ queryKey: ["purchases"] });
+      void qc.invalidateQueries({ queryKey: ["outsource_active_tasks"] });
+      close();
+    } catch (err) {
+      toast.error(humanizeError(err, "建立外包進貨單"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tasks = tasksQ.data ?? [];
+  const vendors = vendorsQ.data ?? [];
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && close()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>外部廠商外包 → 建立進貨單</DialogTitle>
+          <DialogDescription>
+            非系統內公司的外包廠，會建立一張「直接採購」草稿進貨單並關聯到該工序的訂單；
+            確認進貨後產生應付並認列訂單成本。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>工序 *</Label>
+            <Select value={taskId} onValueChange={setTaskId}>
+              <SelectTrigger>
+                <SelectValue placeholder={tasksQ.isLoading ? "載入中…" : "選擇進行中的工序"} />
+              </SelectTrigger>
+              <SelectContent>
+                {tasks.length === 0 && !tasksQ.isLoading ? (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">沒有可外包的工序</div>
+                ) : (
+                  tasks.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {`${t.orders?.order_no ?? "—"} ${t.orders?.item_name ?? ""} / ${
+                        t.work_stations?.name ?? `第 ${t.step_no} 站`
+                      }（${TASK_STATUS_LABEL[t.status] ?? t.status}）`}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {tasksQ.isError && (
+              <p className="text-sm text-destructive">{humanizeError(tasksQ.error, "載入工序")}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>外部廠商 *</Label>
+            <Select value={vendorId} onValueChange={setVendorId}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇廠商（不含系統內公司）" />
+              </SelectTrigger>
+              <SelectContent>
+                {vendors.length === 0 && !vendorsQ.isLoading ? (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">沒有外部廠商</div>
+                ) : (
+                  vendors.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.vendor_code ? `${v.vendor_code} ` : ""}
+                      {v.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ext-amount">金額（未稅）*</Label>
+            <Input
+              id="ext-amount"
+              type="number"
+              min={0}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ext-note">備註</Label>
+            <Textarea id="ext-note" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={close} disabled={saving}>
+            取消
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? "建立中…" : "建立進貨單"}
           </Button>
         </DialogFooter>
       </DialogContent>
