@@ -1,6 +1,6 @@
--- 祥興／沂融 完整回歸測試（含 019–021 新功能）
+-- 祥興／沂融 完整回歸測試（含 019–028 新功能）
 -- 在單一交易內建立 6 個測試帳號與資料，以各角色身分呼叫資料庫，最後 ROLLBACK，不留任何資料。
--- 用法：Supabase SQL Editor 整段貼上執行。2026-10-16 結果：94/94 通過。
+-- 用法：Supabase SQL Editor 整段貼上執行。2026-10-16 結果：98/98 通過（028 應收應付補齊後）。
 begin;
 create temp table _t(n serial, grp text, test text, expect text, actual text, pass boolean) on commit drop;
 grant all on _t to authenticated, anon;
@@ -303,19 +303,46 @@ begin
   select id into pay1 from payables where purchase_id = p1;
   select id into pay2 from payables where purchase_id = p2;
   select payable_id into pay3 from cross_company_links where id = v_link;
+  -- 028：沖帳只能沖同一家廠商的應付
   begin
-    v_res := public.allocate_payment(XX, V_NET30, current_date, 'transfer', 2500,
+    perform public.allocate_payment(XX, V_NET30, current_date, 'transfer', 1500,
       jsonb_build_array(jsonb_build_object('payable_id', pay1, 'amount', 1000),
-                        jsonb_build_object('payable_id', pay2, 'amount', 500),
-                        jsonb_build_object('payable_id', pay3, 'amount', 1000)));
+                        jsonb_build_object('payable_id', pay2, 'amount', 500)));
+    insert into _t(grp,test,expect,actual,pass) values ('S5','付款沖到別家廠商的應付','擋下','未擋', false);
+  exception when others then
+    insert into _t(grp,test,expect,actual,pass) values ('S5','付款沖到別家廠商的應付','擋下','擋下：'||left(sqlerrm,30), true);
+  end;
+  begin
+    -- 實付 600 ＋折讓 400 沖掉 1000
+    v_res := public.allocate_payment(XX, V_NET30, current_date, 'transfer', 600,
+      jsonb_build_array(jsonb_build_object('payable_id', pay1, 'amount', 1000)), null, null, null, null, null, 0, 400);
     v_pay := (v_res->>'payment_id')::uuid;
-    select string_agg(status, ',' order by amount) into v_txt from payables where id in (pay1, pay2, pay3);
-    insert into _t(grp,test,expect,actual,pass) values ('S5','一筆付款沖三筆應付（含部分付款）','paid,paid,partial', v_txt, v_txt = 'paid,paid,partial');
+    select status into v_txt from payables where id = pay1;
+    insert into _t(grp,test,expect,actual,pass) values ('S5','實付＋折讓沖清應付','paid', v_txt, v_txt = 'paid');
     perform public.void_payment(v_pay);
-    select string_agg(status, ',' order by amount) into v_txt from payables where id in (pay1, pay2, pay3);
-    insert into _t(grp,test,expect,actual,pass) values ('S5','付款作廢自動反沖','unpaid ×3', v_txt, v_txt = 'unpaid,unpaid,unpaid');
+    select status || '/' || (select count(*) from payment_allocations where payment_id = v_pay and voided_at is not null)
+      into v_txt from payables where id = pay1;
+    insert into _t(grp,test,expect,actual,pass) values ('S5','付款作廢自動反沖、保留明細','unpaid/1', v_txt, v_txt = 'unpaid/1');
+    -- 預付 800 不沖 → 之後沖 pay2（500）→ 未沖剩 300
+    v_res := public.allocate_payment(XX, V_CASH, current_date, 'cash', 800, '[]'::jsonb);
+    v_pay := (v_res->>'payment_id')::uuid;
+    v_res := public.apply_payment(v_pay, jsonb_build_array(jsonb_build_object('payable_id', pay2, 'amount', 500)));
+    select status || '/' || (v_res->>'unallocated')::numeric::int into v_txt from payables where id = pay2;
+    insert into _t(grp,test,expect,actual,pass) values ('S5','預付款之後再沖帳','paid/300', v_txt, v_txt = 'paid/300');
+    -- 沖銷 pay3 的 100
+    perform public.void_payment(v_pay);  -- 還原，後面的測試要用未付的 pay2
+    v_res := public.write_off_payable(pay3, 100, 'TEST 尾差');
+    select status into v_txt from payables where id = pay3;
+    insert into _t(grp,test,expect,actual,pass) values ('S5','沖銷部分應付','partial', v_txt, v_txt = 'partial');
+    perform public.void_payment((v_res->>'payment_id')::uuid);  -- 還原，後面要調整外包金額
   exception when others then
     insert into _t(grp,test,expect,actual,pass) values ('S5','付款沖帳','成功','錯誤：'||sqlerrm, false);
+  end;
+  begin
+    update payables set paid_amount = 0 where id = pay1;
+    insert into _t(grp,test,expect,actual,pass) values ('S5','主管直接改應付已付金額','擋下','未擋', false);
+  exception when others then
+    insert into _t(grp,test,expect,actual,pass) values ('S5','主管直接改應付已付金額','擋下','擋下', true);
   end;
   begin
     perform public.update_notification_rule((select id from notification_rules where company_id = XX and rule_code = 'task_overdue'), null::boolean, null::boolean, null::boolean, 'digest'::text, null::text[]);
