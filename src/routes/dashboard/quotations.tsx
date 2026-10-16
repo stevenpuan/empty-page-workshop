@@ -167,9 +167,7 @@ function Page() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotations")
-        .select(
-          "*, customer:customers(name, customer_code), items:quotation_items(*)",
-        )
+        .select("*, customer:customers(name, customer_code), items:quotation_items(*)")
         .eq("company_id", company!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -228,10 +226,7 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="報價單"
-        description="建立報價單、追蹤報價狀態、標記為已報價或已接受。"
-      />
+      <PageHeader title="報價單" description="建立報價單、追蹤報價狀態、標記為已報價或已接受。" />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="w-40">
@@ -266,7 +261,12 @@ function Page() {
         </div>
         <div className="flex-1" />
         {canCreate && (
-          <Button onClick={() => { setEditTarget(null); setOpenForm(true); }}>
+          <Button
+            onClick={() => {
+              setEditTarget(null);
+              setOpenForm(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-1" />
             新增報價
           </Button>
@@ -321,9 +321,7 @@ function Page() {
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">{q.quote_no}</TableCell>
-                    <TableCell className="font-medium">
-                      {q.customer?.name ?? "—"}
-                    </TableCell>
+                    <TableCell className="font-medium">{q.customer?.name ?? "—"}</TableCell>
                     <TableCell className="text-sm">{fmtDate(q.quote_date)}</TableCell>
                     <TableCell className="text-sm">{fmtDate(q.valid_until)}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
@@ -350,7 +348,10 @@ function Page() {
                               size="sm"
                               variant="ghost"
                               title="編輯"
-                              onClick={() => { setEditTarget(q); setOpenForm(true); }}
+                              onClick={() => {
+                                setEditTarget(q);
+                                setOpenForm(true);
+                              }}
                             >
                               <Copy className="w-4 h-4" />
                             </Button>
@@ -390,7 +391,10 @@ function Page() {
       <QuotationDialog
         open={openForm}
         editTarget={editTarget}
-        onClose={() => { setOpenForm(false); setEditTarget(null); }}
+        onClose={() => {
+          setOpenForm(false);
+          setEditTarget(null);
+        }}
         onSaved={reload}
       />
 
@@ -398,9 +402,7 @@ function Page() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>作廢報價單 {voidTarget?.quote_no}</AlertDialogTitle>
-            <AlertDialogDescription>
-              作廢後無法恢復，確定要作廢此報價單嗎？
-            </AlertDialogDescription>
+            <AlertDialogDescription>作廢後無法恢復，確定要作廢此報價單嗎？</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
@@ -418,16 +420,12 @@ function QuotationDetail({ quotation }: { quotation: Quotation }) {
   return (
     <div className="py-3 space-y-3">
       <div className="flex flex-wrap gap-4 text-sm">
-        <span>
-          稅別：{TAX_LABEL[quotation.tax_type] ?? quotation.tax_type}
-        </span>
+        <span>稅別：{TAX_LABEL[quotation.tax_type] ?? quotation.tax_type}</span>
         <span>小計：{formatTWD(quotation.subtotal)}</span>
         <span>稅額：{formatTWD(quotation.tax_amount)}</span>
         <span className="font-medium">合計：{formatTWD(quotation.total)}</span>
       </div>
-      {quotation.note && (
-        <p className="text-sm text-muted-foreground">備註：{quotation.note}</p>
-      )}
+      {quotation.note && <p className="text-sm text-muted-foreground">備註：{quotation.note}</p>}
       {items.length > 0 && (
         <Table>
           <TableHeader>
@@ -526,10 +524,7 @@ function QuotationDialog({
   };
 
   // recalc
-  const subtotal = useMemo(
-    () => items.reduce((s, it) => s + num(it.amount), 0),
-    [items],
-  );
+  const subtotal = useMemo(() => items.reduce((s, it) => s + num(it.amount), 0), [items]);
   const taxAmount = calcTax(subtotal, taxType);
   const total = subtotal + taxAmount;
 
@@ -561,25 +556,29 @@ function QuotationDialog({
     try {
       if (isEdit && editTarget) {
         // update quotation header
-        const { error: hErr } = await supabase
+        const { data: updated, error: hErr } = await supabase
           .from("quotations")
           .update({
             customer_id: customerId,
             quote_date: quoteDate,
             valid_until: validUntil || null,
             tax_type: taxType,
-            subtotal,
-            tax_amount: taxAmount,
-            total,
+            // subtotal / tax_amount / total 由 DB trigger 依明細計算，前端不送
             note: note.trim() || null,
             updated_at: new Date().toISOString(),
             updated_by: user?.id ?? null,
           })
-          .eq("id", editTarget.id);
+          .eq("id", editTarget.id)
+          .select("id");
         if (hErr) throw hErr;
+        if (!updated?.length) throw new Error("沒有寫入任何資料（可能沒有權限）");
 
         // delete old items, insert new
-        await supabase.from("quotation_items").delete().eq("quotation_id", editTarget.id);
+        const { error: dErr } = await supabase
+          .from("quotation_items")
+          .delete()
+          .eq("quotation_id", editTarget.id);
+        if (dErr) throw dErr;
         const { error: iErr } = await supabase.from("quotation_items").insert(
           validItems.map((it, i) => ({
             quotation_id: editTarget.id,
@@ -588,7 +587,7 @@ function QuotationDialog({
             qty: num(it.qty),
             unit: it.unit?.trim() || "式",
             unit_price: num(it.unit_price),
-            amount: num(it.qty) * num(it.unit_price),
+            // amount 由 DB trigger 計算（qty × unit_price）
             sort_order: i,
           })),
         );
@@ -612,9 +611,7 @@ function QuotationDialog({
             quote_date: quoteDate,
             valid_until: validUntil || null,
             tax_type: taxType,
-            subtotal,
-            tax_amount: taxAmount,
-            total,
+            // subtotal / tax_amount / total 由 DB trigger 依明細計算，前端不送
             note: note.trim() || null,
             created_by: user?.id ?? null,
             updated_by: user?.id ?? null,
@@ -631,7 +628,7 @@ function QuotationDialog({
             qty: num(it.qty),
             unit: it.unit?.trim() || "式",
             unit_price: num(it.unit_price),
-            amount: num(it.qty) * num(it.unit_price),
+            // amount 由 DB trigger 計算（qty × unit_price）
             sort_order: i,
           })),
         );
@@ -664,9 +661,7 @@ function QuotationDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "編輯報價單" : "新增報價單"}</DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? `編輯 ${editTarget?.quote_no}`
-              : "填寫報價明細，系統自動計算稅額與合計。"}
+            {isEdit ? `編輯 ${editTarget?.quote_no}` : "填寫報價明細，系統自動計算稅額與合計。"}
           </DialogDescription>
         </DialogHeader>
 
@@ -690,11 +685,7 @@ function QuotationDialog({
             </div>
             <div className="space-y-1">
               <Label>報價日期 *</Label>
-              <Input
-                type="date"
-                value={quoteDate}
-                onChange={(e) => setQuoteDate(e.target.value)}
-              />
+              <Input type="date" value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>有效期限</Label>

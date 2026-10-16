@@ -64,7 +64,7 @@ interface PurchaseItem {
   unit: string | null;
   unit_price: number;
   amount: number;
-  is_stocked: boolean;
+  is_warehouse_in: boolean;
 }
 interface Purchase {
   id: string;
@@ -73,14 +73,16 @@ interface Purchase {
   vendor_id: string | null;
   purchase_date: string;
   source_type: string;
-  order_id: string | null;
+  related_order_id: string | null;
   invoice_no: string | null;
   invoice_date: string | null;
   tax_type: string;
-  subtotal: number;
+  amount_untaxed: number;
   tax_amount: number;
-  total: number;
+  amount_total: number;
   status: string;
+  note: string | null;
+  order?: { order_no: string; item_name: string | null } | null;
   vendor?: { name: string; vendor_code: string } | null;
   items?: PurchaseItem[];
 }
@@ -89,7 +91,7 @@ type Draft = {
   vendor_id: string;
   purchase_date: string;
   source_type: string;
-  order_id: string | null;
+  related_order_id: string | null;
   invoice_no: string;
   invoice_date: string;
   tax_type: string;
@@ -113,13 +115,13 @@ const blankItem = (): PurchaseItem => ({
   unit: "",
   unit_price: 0,
   amount: 0,
-  is_stocked: true,
+  is_warehouse_in: true,
 });
 const blankDraft = (): Draft => ({
   vendor_id: "",
   purchase_date: taipeiToday(),
   source_type: "stock",
-  order_id: null,
+  related_order_id: null,
   invoice_no: "",
   invoice_date: "",
   tax_type: "taxable",
@@ -155,7 +157,7 @@ function Page() {
       const { data, error } = await supabase
         .from("orders")
         .select("id, order_no, item_name, status")
-        .neq("status", "completed")
+        .not("status", "in", "(closed,void)")
         .order("created_at", { ascending: false })
         .range(0, 199);
       if (error) throw error;
@@ -173,11 +175,13 @@ function Page() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("*, vendor:vendors(name, vendor_code), items:purchase_items(*)")
+        .select(
+          "id, company_id, purchase_no, vendor_id, purchase_date, source_type, related_order_id, invoice_no, invoice_date, tax_type, amount_untaxed, tax_amount, amount_total, status, note, created_at, vendor:vendors(name, vendor_code), order:orders(order_no, item_name), items:purchase_items(id, purchase_id, item_name, spec, qty, unit, unit_price, amount, is_warehouse_in)",
+        )
         .eq("company_id", company!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Purchase[];
+      return (data ?? []) as unknown as Purchase[];
     },
   });
   const reload = () => qc.invalidateQueries({ queryKey: ["purchases", company?.id] });
@@ -202,7 +206,7 @@ function Page() {
         vendor_id: p.vendor_id ?? "",
         purchase_date: p.purchase_date ?? taipeiToday(),
         source_type: p.source_type ?? "stock",
-        order_id: p.order_id,
+        related_order_id: p.related_order_id,
         invoice_no: p.invoice_no ?? "",
         invoice_date: p.invoice_date ?? "",
         tax_type: p.tax_type ?? "taxable",
@@ -244,13 +248,12 @@ function Page() {
       toast.error("請至少填寫一筆明細");
       return;
     }
-    if (form.source_type === "direct" && !form.order_id) {
+    if (form.source_type === "direct" && !form.related_order_id) {
       toast.error("直接採購請選擇關聯工單");
       return;
     }
     setSaving(true);
     try {
-      const t = totalsOf(items, form.tax_type);
       let purchaseId = form.id;
 
       const header = {
@@ -258,13 +261,11 @@ function Page() {
         vendor_id: form.vendor_id,
         purchase_date: form.purchase_date,
         source_type: form.source_type,
-        order_id: form.source_type === "direct" ? form.order_id : null,
+        related_order_id: form.source_type === "direct" ? form.related_order_id : null,
         invoice_no: form.invoice_no.trim() || null,
         invoice_date: form.invoice_date || null,
         tax_type: form.tax_type,
-        subtotal: t.subtotal,
-        tax_amount: t.tax,
-        total: t.total,
+        // 金額（amount_untaxed / tax_amount / amount_total）由 DB trigger 依明細計算，前端不送
       };
 
       if (purchaseId) {
@@ -300,8 +301,8 @@ function Page() {
         qty: num(it.qty),
         unit: it.unit?.trim() || null,
         unit_price: num(it.unit_price),
-        amount: num(it.qty) * num(it.unit_price),
-        is_stocked: !!it.is_stocked,
+        // amount 由 DB trigger 計算（qty × unit_price）
+        is_warehouse_in: !!it.is_warehouse_in,
       }));
       const insItems = await supabase.from("purchase_items").insert(itemRows).select("id");
       if (insItems.error) throw insItems.error;
@@ -325,9 +326,10 @@ function Page() {
       toast.error(humanizeError(error, "確認進貨單"));
       return;
     }
-    const r = (Array.isArray(data) ? data[0] : data) as
-      | { payable_doc_no?: string; due_date?: string }
-      | null;
+    const r = (Array.isArray(data) ? data[0] : data) as {
+      payable_doc_no?: string;
+      due_date?: string;
+    } | null;
     toast.success(
       r?.payable_doc_no
         ? `已確認，應付單號 ${r.payable_doc_no}${r.due_date ? `，到期日 ${fmtDate(r.due_date)}` : ""}`
@@ -445,12 +447,14 @@ function Page() {
                     {SOURCE_LABEL[p.source_type] ?? p.source_type}
                   </TableCell>
                   <TableCell className="text-sm">{TAX_LABEL[p.tax_type] ?? p.tax_type}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatTWD(p.subtotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatTWD(p.amount_untaxed)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatTWD(p.tax_amount)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
-                    {formatTWD(p.total)}
+                    {formatTWD(p.amount_total)}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(p.status)}>
@@ -519,7 +523,11 @@ function Page() {
                   <Select
                     value={form.source_type}
                     onValueChange={(v) =>
-                      setForm({ ...form, source_type: v, order_id: v === "direct" ? form.order_id : null })
+                      setForm({
+                        ...form,
+                        source_type: v,
+                        related_order_id: v === "direct" ? form.related_order_id : null,
+                      })
                     }
                   >
                     <SelectTrigger>
@@ -537,8 +545,8 @@ function Page() {
                 <div className="space-y-1">
                   <Label>關聯工單 *</Label>
                   <Select
-                    value={form.order_id ?? ""}
-                    onValueChange={(v) => setForm({ ...form, order_id: v })}
+                    value={form.related_order_id ?? ""}
+                    onValueChange={(v) => setForm({ ...form, related_order_id: v })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="選擇工單" />
@@ -655,8 +663,8 @@ function Page() {
                           </TableCell>
                           <TableCell>
                             <Switch
-                              checked={!!it.is_stocked}
-                              onCheckedChange={(v) => setItem(idx, { is_stocked: v })}
+                              checked={!!it.is_warehouse_in}
+                              onCheckedChange={(v) => setItem(idx, { is_warehouse_in: v })}
                             />
                           </TableCell>
                           <TableCell>
@@ -737,6 +745,18 @@ function Page() {
                   <span className="text-muted-foreground">發票：</span>
                   {readonlyDoc.invoice_no ?? "—"}
                 </div>
+                {readonlyDoc.order && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">關聯工單：</span>
+                    {readonlyDoc.order.order_no} {readonlyDoc.order.item_name ?? ""}
+                  </div>
+                )}
+                {readonlyDoc.note && (
+                  <div className="col-span-2 sm:col-span-3">
+                    <span className="text-muted-foreground">備註：</span>
+                    {readonlyDoc.note}
+                  </div>
+                )}
               </div>
               <div className="overflow-x-auto rounded-md border border-border">
                 <Table>
@@ -773,7 +793,7 @@ function Page() {
               <div className="ml-auto w-full sm:w-72 space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">未稅小計</span>
-                  <span className="tabular-nums">{formatTWD(readonlyDoc.subtotal)}</span>
+                  <span className="tabular-nums">{formatTWD(readonlyDoc.amount_untaxed)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">稅額</span>
@@ -781,7 +801,7 @@ function Page() {
                 </div>
                 <div className="flex justify-between font-semibold text-base border-t border-border pt-1">
                   <span>合計</span>
-                  <span className="tabular-nums">{formatTWD(readonlyDoc.total)}</span>
+                  <span className="tabular-nums">{formatTWD(readonlyDoc.amount_total)}</span>
                 </div>
               </div>
             </div>
