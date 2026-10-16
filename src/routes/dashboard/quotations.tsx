@@ -1,8 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, ChevronDown, ChevronRight, Copy, Send, Ban } from "lucide-react";
+import {
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Send,
+  Ban,
+  FileOutput,
+  ExternalLink,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -91,6 +100,7 @@ interface Quotation {
   total: number;
   note: string | null;
   created_at: string;
+  order_id: string | null;
   customer?: { name: string; customer_code: string } | null;
   items?: QuotationItem[];
 }
@@ -141,12 +151,38 @@ function calcTax(subtotal: number, taxType: string) {
   return 0;
 }
 
+const QUOTATION_COLUMNS =
+  "id, company_id, quote_no, customer_id, quote_date, valid_until, status, subtotal, tax_type, tax_amount, total, note, created_at, order_id, " +
+  "customer:customers(name, customer_code), " +
+  "items:quotation_items(id, quotation_id, item_name, spec, qty, unit, unit_price, amount, sort_order)";
+
+/** 報價單狀態只能透過 set_quotation_status RPC 轉換（直接 update status 會被 DB 擋下 P0007） */
+async function setQuotationStatus(id: string, status: string, ctx: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("set_quotation_status", {
+    p_quotation_id: id,
+    p_status: status,
+  });
+  if (error) {
+    toast.error(humanizeError(error, ctx));
+    return false;
+  }
+  const res = (Array.isArray(data) ? data[0] : data) as { ok?: boolean } | null;
+  if (!res?.ok) {
+    toast.error("報價單狀態沒有更新（可能沒有權限），請重新整理後再試");
+    return false;
+  }
+  return true;
+}
+
 /* ---- main page ---- */
 function Page() {
   const { company, can } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const canCreate = can("quotations", "create");
   const canEdit = can("quotations", "edit");
+  const canCreateOrder = can("orders", "create");
+  const [convertTarget, setConvertTarget] = useState<Quotation | null>(null);
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -167,11 +203,31 @@ function Page() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotations")
-        .select("*, customer:customers(name, customer_code), items:quotation_items(*)")
+        .select(QUOTATION_COLUMNS)
         .eq("company_id", company!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as Quotation[];
+    },
+  });
+
+  // 已轉訂單的報價單：另外依 order_id 查訂單單號（不依賴 FK 名稱做 embed）
+  const orderIds = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.order_id).filter((x): x is string => !!x))).sort(),
+    [rows],
+  );
+  const { data: orderNoMap = {} } = useQuery({
+    queryKey: ["quotation_order_nos", company?.id, orderIds],
+    enabled: !!company?.id && orderIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_no")
+        .in("id", orderIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const o of (data ?? []) as { id: string; order_no: string }[]) map[o.id] = o.order_no;
+      return map;
     },
   });
 
@@ -185,43 +241,37 @@ function Page() {
 
   const doVoid = async () => {
     if (!voidTarget) return;
-    const { error } = await supabase
-      .from("quotations")
-      .update({ status: "void", updated_at: new Date().toISOString() })
-      .eq("id", voidTarget.id);
-    if (error) {
-      toast.error(humanizeError(error, "作廢報價單"));
-      return;
-    }
+    const ok = await setQuotationStatus(voidTarget.id, "void", "作廢報價單");
+    if (!ok) return;
     toast.success("已作廢報價單");
     setVoidTarget(null);
     reload();
   };
 
   const markSent = async (q: Quotation) => {
-    const { error } = await supabase
-      .from("quotations")
-      .update({ status: "sent", updated_at: new Date().toISOString() })
-      .eq("id", q.id);
-    if (error) {
-      toast.error(humanizeError(error, "更新狀態"));
-      return;
-    }
+    const ok = await setQuotationStatus(q.id, "sent", "更新狀態");
+    if (!ok) return;
     toast.success("已標記為已報價");
     reload();
   };
 
   const markAccepted = async (q: Quotation) => {
-    const { error } = await supabase
-      .from("quotations")
-      .update({ status: "accepted", updated_at: new Date().toISOString() })
-      .eq("id", q.id);
-    if (error) {
-      toast.error(humanizeError(error, "更新狀態"));
-      return;
-    }
+    const ok = await setQuotationStatus(q.id, "accepted", "更新狀態");
+    if (!ok) return;
     toast.success("已標記為已接受");
     reload();
+  };
+
+  const onConverted = (orderId: string, orderNo: string) => {
+    toast.success(`已轉為訂單 ${orderNo}（草稿）`, {
+      action: {
+        label: "查看訂單",
+        onClick: () => void navigate({ to: "/dashboard/orders/$orderId", params: { orderId } }),
+      },
+    });
+    setConvertTarget(null);
+    reload();
+    void qc.invalidateQueries({ queryKey: ["orders", company?.id] });
   };
 
   return (
@@ -371,6 +421,21 @@ function Page() {
                             標記已接受
                           </Button>
                         )}
+                        {q.status === "accepted" && !q.order_id && canCreateOrder && (
+                          <Button size="sm" variant="outline" onClick={() => setConvertTarget(q)}>
+                            <FileOutput className="w-4 h-4 mr-1" />
+                            轉訂單
+                          </Button>
+                        )}
+                        {q.order_id && (
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link to="/dashboard/orders/$orderId" params={{ orderId: q.order_id }}>
+                              已轉訂單
+                              {orderNoMap[q.order_id] ? ` ${orderNoMap[q.order_id]}` : ""}
+                              <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -398,6 +463,12 @@ function Page() {
         onSaved={reload}
       />
 
+      <ConvertDialog
+        quotation={convertTarget}
+        onClose={() => setConvertTarget(null)}
+        onConverted={onConverted}
+      />
+
       <AlertDialog open={!!voidTarget} onOpenChange={(o) => !o && setVoidTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -411,6 +482,84 @@ function Page() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/* ---- convert to order ---- */
+function ConvertDialog({
+  quotation,
+  onClose,
+  onConverted,
+}: {
+  quotation: Quotation | null;
+  onClose: () => void;
+  onConverted: (orderId: string, orderNo: string) => void;
+}) {
+  const [dueDate, setDueDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!quotation) return;
+    setSaving(true);
+    const { data, error } = await supabase.rpc("convert_quotation_to_order", {
+      p_quotation_id: quotation.id,
+      p_due_date: dueDate || null,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(humanizeError(error, "報價單轉訂單"));
+      return;
+    }
+    const res = (Array.isArray(data) ? data[0] : data) as {
+      ok?: boolean;
+      order_id?: string;
+      order_no?: string;
+    } | null;
+    if (!res?.ok || !res.order_id) {
+      toast.error("沒有建立訂單（可能沒有權限），請重新整理後再試");
+      return;
+    }
+    setDueDate("");
+    onConverted(res.order_id, res.order_no ?? "");
+  };
+
+  return (
+    <Dialog
+      open={!!quotation}
+      onOpenChange={(o) => {
+        if (!o) {
+          setDueDate("");
+          onClose();
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>報價單轉訂單 {quotation?.quote_no}</DialogTitle>
+          <DialogDescription>
+            將依報價單的客戶、第一筆品名／規格與金額建立一張「草稿」訂單，每張報價單只能轉一次。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1">
+          <Label>交期（選填）</Label>
+          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDueDate("");
+              onClose();
+            }}
+          >
+            取消
+          </Button>
+          <Button onClick={() => void submit()} disabled={saving}>
+            {saving ? "轉換中…" : "確認轉訂單"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1173,24 +1173,21 @@ function AddCostDialog({
       return;
     }
     setSaving(true);
-    const { data, error } = await supabase
-      .from("order_costs")
-      .insert({
-        company_id: companyId,
-        order_id: orderId,
-        cost_type: costType,
-        source_type: "manual",
-        amount: amt,
-        recognized_at: date,
-        note: note.trim() || null,
-      })
-      .select("id");
+    // 手動成本只能透過 add_order_cost RPC 寫入（直接 insert order_costs 已收回權限）
+    const { data, error } = await supabase.rpc("add_order_cost", {
+      p_order_id: orderId,
+      p_cost_type: costType,
+      p_amount: amt,
+      p_recognized_at: date || null,
+      p_note: note.trim() || null,
+    });
     setSaving(false);
     if (error) {
       toast.error(humanizeError(error, "新增成本"));
       return;
     }
-    if (!data || data.length === 0) {
+    const res = (Array.isArray(data) ? data[0] : data) as { ok?: boolean; cost_id?: string } | null;
+    if (!res?.ok || !res.cost_id) {
       toast.error(humanizeError(null, "新增成本（寫入 0 筆）"));
       return;
     }
