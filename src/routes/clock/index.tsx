@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,7 @@ import {
   X,
   ArrowLeft,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { AmendmentPanel } from "@/components/attendance/AmendmentPanel";
 import { supabase } from "@/lib/supabase";
@@ -20,8 +21,7 @@ import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
 import { taipeiToday } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/clock/")({
   head: () => ({
@@ -41,32 +41,40 @@ const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 interface Attendance {
   id: string;
-  employee_id: string;
-  work_date: string;
   clock_in_at: string | null;
-  clock_in_lat: number | null;
-  clock_in_lng: number | null;
   clock_in_distance_m: number | null;
-  clock_in_abnormal: boolean | null;
   clock_out_at: string | null;
-  clock_out_lat: number | null;
-  clock_out_lng: number | null;
   clock_out_distance_m: number | null;
-  clock_out_abnormal: boolean | null;
   status: string | null;
+  late_minutes: number | null;
+  early_leave_minutes: number | null;
   work_minutes: number | null;
-  overtime_minutes: number | null;
+  ot_minutes_134: number | null;
+  ot_minutes_167: number | null;
+  ot_minutes_holiday: number | null;
+  is_abnormal_location: boolean | null;
+  abnormal_reason: string | null;
 }
 
-const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  normal: { label: "正常", cls: "bg-green-100 text-green-800 border-green-200" },
-  late: { label: "遲到", cls: "bg-red-100 text-red-800 border-red-200" },
-  early_leave: { label: "早退", cls: "bg-orange-100 text-orange-800 border-orange-200" },
-  missing: { label: "缺卡", cls: "bg-gray-100 text-gray-600 border-gray-200" },
-};
+interface Shift {
+  name: string;
+  start_time: string;
+  end_time: string;
+}
+
+interface Place {
+  lat: number | null;
+  lng: number | null;
+  radius: number;
+}
+
+type Geo =
+  | { state: "idle" | "locating" }
+  | { state: "ok"; lat: number; lng: number; distance: number | null }
+  | { state: "error"; message: string };
 
 function fmtTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "--:--";
   return new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",
     hour: "2-digit",
@@ -75,14 +83,40 @@ function fmtTime(iso: string | null): string {
   }).format(new Date(iso));
 }
 
+/** 兩點距離（公尺） */
+function distanceM(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+const fmtDistance = (m: number) =>
+  m >= 1000 ? `${(m / 1000).toFixed(1)} 公里` : `${Math.round(m)} 公尺`;
+
+const geoMessage = (e: GeolocationPositionError) =>
+  e.code === e.PERMISSION_DENIED
+    ? "沒有定位權限，請在手機設定允許瀏覽器使用位置"
+    : e.code === e.TIMEOUT
+      ? "定位逾時，請到戶外或靠窗再試"
+      : "無法取得位置";
+
 function ClockPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { session, employee, loading, permsLoaded } = useAuth();
+  const { session, employee, company, loading, permsLoaded } = useAuth();
   const [now, setNow] = useState(() => new Date());
-  const [locating, setLocating] = useState<"in" | "out" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
+  const [geo, setGeo] = useState<Geo>({ state: "idle" });
+  const [justDone, setJustDone] = useState<string | null>(null);
   const { amend } = Route.useSearch();
   const [amendOpen, setAmendOpen] = useState(!!amend);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -96,18 +130,19 @@ function ClockPage() {
   const today = taipeiToday();
   const empId = employee?.id ?? null;
 
-  const timeStr = new Intl.DateTimeFormat("en-GB", {
+  const hm = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Taipei",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     hour12: false,
   }).format(now);
+  const sec = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Taipei", second: "2-digit" })
+    .format(now)
+    .padStart(2, "0");
   const dateStr = new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    month: "long",
+    day: "numeric",
   }).format(now);
   const weekdayName = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Taipei",
@@ -122,7 +157,9 @@ function ClockPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendances")
-        .select("*")
+        .select(
+          "id, clock_in_at, clock_in_distance_m, clock_out_at, clock_out_distance_m, status, late_minutes, early_leave_minutes, work_minutes, ot_minutes_134, ot_minutes_167, ot_minutes_holiday, is_abnormal_location, abnormal_reason",
+        )
         .eq("employee_id", empId!)
         .eq("work_date", today)
         .maybeSingle();
@@ -131,11 +168,11 @@ function ClockPage() {
     },
   });
 
-  // 員工班別（employees.shift_id → shifts.name）
+  // 班別：員工自己的，沒設定就用公司的第一個班別（與資料庫打卡規則相同）
   const { data: shift } = useQuery({
     queryKey: ["employee_shift", empId],
     enabled: !!empId,
-    queryFn: async () => {
+    queryFn: async (): Promise<Shift | null> => {
       const { data: emp, error: eErr } = await supabase
         .from("employees")
         .select("shift_id")
@@ -143,194 +180,332 @@ function ClockPage() {
         .maybeSingle();
       if (eErr) throw eErr;
       const shiftId = (emp as { shift_id?: string | null } | null)?.shift_id;
-      if (!shiftId) return null;
-      const { data: s, error: sErr } = await supabase
-        .from("shifts")
-        .select("name, start_time, end_time")
-        .eq("id", shiftId)
-        .maybeSingle();
-      if (sErr) throw sErr;
-      return (s as { name: string; start_time: string; end_time: string } | null) ?? null;
+      let q = supabase.from("shifts").select("name, start_time, end_time");
+      q = shiftId ? q.eq("id", shiftId) : q.eq("is_active", true).order("created_at").limit(1);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? [])[0] as Shift | undefined) ?? null;
     },
   });
 
+  // 公司打卡座標與範圍（只用來事先顯示距離，實際判斷在資料庫）
+  const { data: place } = useQuery({
+    queryKey: ["clock_place", company?.id],
+    enabled: !!company?.id,
+    queryFn: async (): Promise<Place> => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("lat, lng, clock_radius_m")
+        .eq("id", company!.id)
+        .maybeSingle();
+      if (error) throw error;
+      const r = (data ?? {}) as {
+        lat?: number | string | null;
+        lng?: number | string | null;
+        clock_radius_m?: number | null;
+      };
+      return {
+        lat: r.lat == null ? null : Number(r.lat),
+        lng: r.lng == null ? null : Number(r.lng),
+        radius: r.clock_radius_m ?? 150,
+      };
+    },
+  });
+
+  const locate = useCallback(
+    (maximumAge = 30000) =>
+      new Promise<{ lat: number; lng: number } | null>((resolve) => {
+        if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+          setGeo({ state: "error", message: "這支手機不支援定位" });
+          resolve(null);
+          return;
+        }
+        setGeo((g) => (g.state === "ok" ? g : { state: "locating" }));
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            setGeo({
+              state: "ok",
+              lat,
+              lng,
+              distance:
+                place?.lat != null && place.lng != null
+                  ? distanceM(place.lat, place.lng, lat, lng)
+                  : null,
+            });
+            resolve({ lat, lng });
+          },
+          (e) => {
+            setGeo({ state: "error", message: geoMessage(e) });
+            resolve(null);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge },
+        );
+      }),
+    [place],
+  );
+
+  // 進頁面先定位一次，讓員工打卡前就知道有沒有在範圍內
+  useEffect(() => {
+    if (place) void locate();
+  }, [place, locate]);
+
   const clockedIn = !!att?.clock_in_at;
   const clockedOut = !!att?.clock_out_at;
+  const kind: "in" | "out" | null = !clockedIn ? "in" : !clockedOut ? "out" : null;
 
-  const doClock = async (kind: "in" | "out") => {
-    setLocating(kind);
-    const invoke = async (lat: number | null, lng: number | null) => {
-      const rpc = kind === "in" ? "clock_in" : "clock_out";
-      const { data, error } = await supabase.rpc(rpc, { p_lat: lat, p_lng: lng });
-      if (error) {
-        toast.error(humanizeError(error, kind === "in" ? "上班打卡" : "下班打卡"));
-      } else {
-        toast.success(
-          typeof data === "string"
-            ? data
-            : kind === "in"
-              ? "上班打卡成功"
-              : "下班打卡成功",
-        );
-        await refetch();
-        qc.invalidateQueries({ queryKey: ["attendance_today"] });
-      }
-      setLocating(null);
-    };
-    if (!("geolocation" in navigator)) {
-      toast.warning("此裝置不支援定位，將不帶座標打卡");
-      await invoke(null, null);
+  // 還沒到下班時間就按下班：要再按一次確認，避免誤觸
+  const beforeShiftEnd = (() => {
+    if (!shift?.end_time) return false;
+    const [h = 0, m = 0] = shift.end_time.split(":").map(Number);
+    const [nh = 0, nm = 0] = hm.split(":").map(Number);
+    return nh * 60 + nm < h * 60 + m;
+  })();
+
+  const doClock = async () => {
+    if (!kind || busy) return;
+    if (kind === "out" && beforeShiftEnd && !confirmOut) {
+      setConfirmOut(true);
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+      confirmTimer.current = setTimeout(() => setConfirmOut(false), 4000);
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => void invoke(pos.coords.latitude, pos.coords.longitude),
-      (geoErr) => {
-        toast.warning(`定位失敗（${geoErr.message}），將不帶座標打卡`);
-        void invoke(null, null);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+    setConfirmOut(false);
+    setBusy(true);
+    try {
+      const pos = await locate(5000);
+      if (!pos) toast.warning("沒有取得位置，這次打卡不會記錄位置");
+      const { error } = await supabase.rpc(kind === "in" ? "clock_in" : "clock_out", {
+        p_lat: pos?.lat ?? null,
+        p_lng: pos?.lng ?? null,
+      });
+      if (error) {
+        toast.error(humanizeError(error, kind === "in" ? "上班打卡" : "下班打卡"));
+        return;
+      }
+      try {
+        navigator.vibrate?.(80);
+      } catch {
+        /* 部分手機不支援震動 */
+      }
+      setJustDone(kind === "in" ? `上班打卡完成 ${hm}` : `下班打卡完成 ${hm}`);
+      setTimeout(() => setJustDone(null), 4000);
+      await refetch();
+      void qc.invalidateQueries({ queryKey: ["attendance_today"] });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const statusInfo = att?.status ? STATUS_LABEL[att.status] : null;
-  const workHours = useMemo(
-    () => (att?.work_minutes != null ? (att.work_minutes / 60).toFixed(1) : "—"),
-    [att],
-  );
-  const overtimeHours = useMemo(
-    () => (att?.overtime_minutes != null ? (att.overtime_minutes / 60).toFixed(1) : "—"),
-    [att],
-  );
-
   if (loading || !permsLoaded) {
-    return <div className="min-h-screen grid place-items-center text-muted-foreground">載入中…</div>;
+    return (
+      <div className="grid min-h-[100dvh] place-items-center text-muted-foreground">載入中…</div>
+    );
   }
   if (!session) return null;
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col items-center px-4 pb-8 pt-3">
-      <div className="w-full max-w-md space-y-6">
-        {/* 回系統 */}
-        <div className="-mb-2">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-            <Link to="/dashboard">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              回營運系統
-            </Link>
-          </Button>
-        </div>
+  const inRange =
+    geo.state === "ok" && geo.distance != null && place ? geo.distance <= place.radius : null;
+  const otMin =
+    (att?.ot_minutes_134 ?? 0) + (att?.ot_minutes_167 ?? 0) + (att?.ot_minutes_holiday ?? 0);
+  const workText =
+    att?.work_minutes != null
+      ? `${Math.floor(att.work_minutes / 60)} 小時 ${att.work_minutes % 60} 分`
+      : null;
 
-        {/* 頂部時間與員工資訊 */}
-        <div className="text-center space-y-1">
-          <div className="text-5xl font-mono font-bold tracking-wider tabular-nums">{timeStr}</div>
-          <div className="text-muted-foreground">
-            {dateStr} 星期{weekday}
-          </div>
-          <div className="text-sm text-muted-foreground pt-1">
-            {employee?.name ?? "—"}
-            {shift ? `・${shift.name}` : ""}
-          </div>
+  return (
+    <div
+      className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-background"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      {/* 頂列：返回、公司、姓名 */}
+      <header
+        className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background/95 px-2 py-1.5 backdrop-blur"
+        style={{ paddingTop: "max(0.375rem, env(safe-area-inset-top))" }}
+      >
+        <Button asChild variant="ghost" className="h-11 px-2 text-base">
+          <Link to="/dashboard" aria-label="回營運系統">
+            <ArrowLeft className="mr-1 h-5 w-5" />
+            系統
+          </Link>
+        </Button>
+        <div className="flex-1 truncate text-center text-base font-semibold">
+          {company?.short_name ?? company?.name ?? "打卡"}
         </div>
+        <div className="max-w-[6rem] truncate px-2 text-right text-sm text-muted-foreground">
+          {employee?.name ?? ""}
+        </div>
+      </header>
+
+      <main className="flex flex-1 flex-col gap-5 px-4 pt-5">
+        {/* 時間 */}
+        <section className="text-center">
+          <div className="font-mono text-6xl font-bold tabular-nums tracking-tight">
+            {hm}
+            <span className="ml-1 align-top text-2xl text-muted-foreground">{sec}</span>
+          </div>
+          <div className="mt-1 text-lg text-muted-foreground">
+            {dateStr}（{weekday}）
+          </div>
+          {shift && (
+            <div className="mt-0.5 text-sm text-muted-foreground">
+              班別 {shift.start_time.slice(0, 5)}～{shift.end_time.slice(0, 5)}
+            </div>
+          )}
+        </section>
+
+        {/* 定位狀態 */}
+        <button
+          type="button"
+          onClick={() => void locate(0)}
+          className={`flex min-h-12 items-center justify-center gap-2 rounded-full px-4 py-2 text-base ${
+            geo.state === "ok" && inRange === true
+              ? "bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300"
+              : geo.state === "ok" && inRange === false
+                ? "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-300"
+                : geo.state === "error"
+                  ? "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
+                  : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {geo.state === "locating" || geo.state === "idle" ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <MapPin className="h-5 w-5 shrink-0" />
+          )}
+          <span>
+            {geo.state === "ok"
+              ? geo.distance == null
+                ? "已取得位置"
+                : inRange
+                  ? `在公司範圍內（${fmtDistance(geo.distance)}）`
+                  : `離公司 ${fmtDistance(geo.distance)}，超出範圍`
+              : geo.state === "error"
+                ? geo.message
+                : "定位中…"}
+          </span>
+          {geo.state !== "locating" && <RefreshCw className="h-4 w-4 shrink-0 opacity-60" />}
+        </button>
+        {geo.state === "ok" && inRange === false && (
+          <p className="-mt-3 text-center text-sm text-muted-foreground">
+            還是可以打卡，但會標示異常並通知主管
+          </p>
+        )}
 
         {/* 打卡大按鈕 */}
-        <div className="flex justify-center py-4">
-          {!clockedIn ? (
+        <section className="flex flex-col items-center gap-3 py-2">
+          {kind ? (
             <button
               type="button"
-              disabled={locating !== null}
-              onClick={() => void doClock("in")}
-              className="w-44 h-44 rounded-full bg-green-600 hover:bg-green-700 active:scale-95 transition text-white flex flex-col items-center justify-center gap-2 shadow-lg disabled:opacity-60"
+              disabled={busy}
+              onClick={() => void doClock()}
+              className={`flex h-56 w-56 select-none flex-col items-center justify-center gap-2 rounded-full text-white shadow-xl transition active:scale-95 disabled:opacity-70 ${
+                kind === "in"
+                  ? "bg-green-600 active:bg-green-700"
+                  : confirmOut
+                    ? "bg-red-600 active:bg-red-700"
+                    : "bg-orange-500 active:bg-orange-600"
+              }`}
+              style={{ WebkitTapHighlightColor: "transparent" }}
             >
-              {locating === "in" ? (
+              {busy ? (
                 <>
-                  <Loader2 className="h-10 w-10 animate-spin" />
-                  <span className="text-lg">定位中…</span>
+                  <Loader2 className="h-12 w-12 animate-spin" />
+                  <span className="text-xl">打卡中…</span>
                 </>
               ) : (
                 <>
-                  <LogIn className="h-10 w-10" />
-                  <span className="text-xl font-bold">上班打卡</span>
-                </>
-              )}
-            </button>
-          ) : !clockedOut ? (
-            <button
-              type="button"
-              disabled={locating !== null}
-              onClick={() => void doClock("out")}
-              className="w-44 h-44 rounded-full bg-orange-500 hover:bg-orange-600 active:scale-95 transition text-white flex flex-col items-center justify-center gap-2 shadow-lg disabled:opacity-60"
-            >
-              {locating === "out" ? (
-                <>
-                  <Loader2 className="h-10 w-10 animate-spin" />
-                  <span className="text-lg">定位中…</span>
-                </>
-              ) : (
-                <>
-                  <LogOut className="h-10 w-10" />
-                  <span className="text-xl font-bold">下班打卡</span>
+                  {kind === "in" ? (
+                    <LogIn className="h-12 w-12" />
+                  ) : (
+                    <LogOut className="h-12 w-12" />
+                  )}
+                  <span className="text-3xl font-bold">{kind === "in" ? "上班" : "下班"}</span>
+                  <span className="text-base opacity-90">
+                    {confirmOut ? "還沒到下班時間，再按一次" : "點一下打卡"}
+                  </span>
                 </>
               )}
             </button>
           ) : (
-            <div className="w-44 h-44 rounded-full bg-muted text-muted-foreground flex flex-col items-center justify-center gap-2 shadow-inner">
-              <CheckCircle2 className="h-10 w-10" />
-              <span className="text-lg font-medium">今日已完成打卡</span>
+            <div className="flex h-56 w-56 flex-col items-center justify-center gap-2 rounded-full bg-muted text-muted-foreground">
+              <CheckCircle2 className="h-12 w-12 text-green-600" />
+              <span className="text-2xl font-semibold text-foreground">今天辛苦了</span>
+              <span className="text-base">上下班都打好了</span>
             </div>
           )}
-        </div>
-
-        {/* 今日打卡資訊 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center justify-between">
-              今日打卡資訊
-              {statusInfo && (
-                <Badge variant="outline" className={statusInfo.cls}>
-                  {statusInfo.label}
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <InfoRow
-              label="上班"
-              time={fmtTime(att?.clock_in_at ?? null)}
-              distance={att?.clock_in_distance_m ?? null}
-              abnormal={att?.clock_in_abnormal ?? null}
-            />
-            <InfoRow
-              label="下班"
-              time={fmtTime(att?.clock_out_at ?? null)}
-              distance={att?.clock_out_distance_m ?? null}
-              abnormal={att?.clock_out_abnormal ?? null}
-            />
-            <div className="flex justify-between border-t pt-3">
-              <span className="text-muted-foreground">工時</span>
-              <span className="font-medium tabular-nums">{workHours === "—" ? "—" : `${workHours} 小時`}</span>
+          {justDone && (
+            <div className="flex items-center gap-2 rounded-full bg-green-600 px-4 py-2 text-base font-medium text-white">
+              <CheckCircle2 className="h-5 w-5" />
+              {justDone}
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">加班時數</span>
-              <span className="font-medium tabular-nums">{overtimeHours === "—" ? "—" : `${overtimeHours} 小時`}</span>
-            </div>
-          </CardContent>
-        </Card>
+          )}
+        </section>
 
-        {/* 補卡：在這頁直接展開，不另開頁面 */}
+        {/* 今天 */}
+        <section className="grid grid-cols-2 gap-3">
+          <TimeTile
+            label="上班"
+            time={fmtTime(att?.clock_in_at ?? null)}
+            note={
+              att?.status === "late" && (att.late_minutes ?? 0) > 0
+                ? `遲到 ${att.late_minutes} 分`
+                : att?.clock_in_at
+                  ? "準時"
+                  : null
+            }
+            warn={att?.status === "late"}
+          />
+          <TimeTile
+            label="下班"
+            time={fmtTime(att?.clock_out_at ?? null)}
+            note={
+              (att?.early_leave_minutes ?? 0) > 0
+                ? `早退 ${att?.early_leave_minutes} 分`
+                : att?.clock_out_at
+                  ? "正常"
+                  : null
+            }
+            warn={(att?.early_leave_minutes ?? 0) > 0}
+          />
+        </section>
+        {(workText || otMin > 0 || att?.is_abnormal_location) && (
+          <section className="space-y-1 rounded-xl bg-muted/50 px-4 py-3 text-base">
+            {workText && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">今天工時</span>
+                <span className="tabular-nums">{workText}</span>
+              </div>
+            )}
+            {otMin > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">加班</span>
+                <span className="tabular-nums">{(otMin / 60).toFixed(1)} 小時</span>
+              </div>
+            )}
+            {att?.is_abnormal_location && (
+              <div className="text-sm text-amber-700 dark:text-amber-400">
+                ⚠ {att.abnormal_reason ?? "打卡位置異常"}（主管會看到，有需要請申請補卡說明）
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* 補卡：在這頁直接展開 */}
         <Card>
           <button
             type="button"
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
+            className="flex min-h-14 w-full items-center justify-between px-4 text-left"
             onClick={() => setAmendOpen((v) => !v)}
             aria-expanded={amendOpen}
           >
-            <span className="flex items-center gap-2 font-medium">
-              <ClipboardEdit className="h-4 w-4 text-muted-foreground" />
-              申請補卡
-              <span className="text-xs font-normal text-muted-foreground">忘記打卡或打卡異常</span>
+            <span className="flex items-center gap-2 text-base font-medium">
+              <ClipboardEdit className="h-5 w-5 text-muted-foreground" />
+              忘記打卡？申請補卡
             </span>
             <ChevronDown
-              className={`h-4 w-4 text-muted-foreground transition-transform ${amendOpen ? "rotate-180" : ""}`}
+              className={`h-5 w-5 text-muted-foreground transition-transform ${amendOpen ? "rotate-180" : ""}`}
             />
           </button>
           {amendOpen && (
@@ -341,6 +516,29 @@ function ClockPage() {
         </Card>
 
         <InstallHint />
+        <div className="h-4" />
+      </main>
+    </div>
+  );
+}
+
+function TimeTile({
+  label,
+  time,
+  note,
+  warn,
+}: {
+  label: string;
+  time: string;
+  note: string | null;
+  warn?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border px-4 py-3 text-center">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="font-mono text-3xl font-semibold tabular-nums">{time}</div>
+      <div className={`h-5 text-sm ${warn ? "text-red-600" : "text-muted-foreground"}`}>
+        {note ?? ""}
       </div>
     </div>
   );
@@ -377,7 +575,9 @@ function InstallHint() {
     }
     if (dismissed) return;
     const ua = navigator.userAgent;
-    setIsIOS(/iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1));
+    setIsIOS(
+      /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1),
+    );
     setShow(true);
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -440,37 +640,5 @@ function InstallHint() {
         </button>
       </CardContent>
     </Card>
-  );
-}
-
-function InfoRow({
-  label,
-  time,
-  distance,
-  abnormal,
-}: {
-  label: string;
-  time: string;
-  distance: number | null;
-  abnormal: boolean | null;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="font-medium tabular-nums text-base">{time}</span>
-        {distance != null && (
-          <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-            <MapPin className="h-3 w-3" />
-            {Math.round(distance)} m
-          </span>
-        )}
-        {abnormal && (
-          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-            異常
-          </Badge>
-        )}
-      </div>
-    </div>
   );
 }

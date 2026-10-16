@@ -12,13 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type RequestType = "clock_in" | "clock_out" | "both";
 
@@ -223,19 +216,20 @@ export function AmendmentPanel() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="request-type">補卡類型</Label>
-                <Select value={requestType} onValueChange={(v) => setRequestType(v as RequestType)}>
-                  <SelectTrigger id="request-type">
-                    <SelectValue placeholder="請選擇補卡類型" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REQUEST_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>補卡類型</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {REQUEST_TYPES.map((t) => (
+                    <Button
+                      key={t.value}
+                      type="button"
+                      variant={requestType === t.value ? "default" : "outline"}
+                      className="h-12 px-1 text-base"
+                      onClick={() => setRequestType(t.value)}
+                    >
+                      {t.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -247,7 +241,7 @@ export function AmendmentPanel() {
                   type="datetime-local"
                   value={requestTime}
                   onChange={(e) => setRequestTime(e.target.value)}
-                  className="tabular-nums"
+                  className="h-12 text-base tabular-nums"
                 />
               </div>
 
@@ -259,7 +253,7 @@ export function AmendmentPanel() {
                     type="datetime-local"
                     value={requestTimeOut}
                     onChange={(e) => setRequestTimeOut(e.target.value)}
-                    className="tabular-nums"
+                    className="h-12 text-base tabular-nums"
                   />
                 </div>
               )}
