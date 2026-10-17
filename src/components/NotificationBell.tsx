@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Check, X, Clock, BellOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { goToNotification } from "@/lib/notification-route";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
 import { Button } from "@/components/ui/button";
@@ -35,16 +36,6 @@ function relativeTime(iso: string): string {
   if (day < 30) return `${day} 天前`;
   return new Date(iso).toLocaleDateString("zh-TW");
 }
-
-/** 依 ref_type 導航到相關頁面；無匹配回傳 false（僅標記已讀） */
-const REF_ROUTE: Record<string, string> = {
-  attendance: "/attendance",
-  payable: "/dashboard/payables",
-  receivable: "/dashboard/receivables",
-  employee: "/dashboard/settings/employees",
-  quotation: "/dashboard/quotations",
-  leave_request: "/attendance",
-};
 
 /** 側欄鈴鐺＋通知中心下拉面板：未讀數、Realtime 訂閱、標記已讀、導航 */
 export function NotificationBell() {
@@ -147,25 +138,9 @@ export function NotificationBell() {
       if (error) toast.error(humanizeError(error, "標記已讀"));
       else refresh();
     }
-    if (n.ref_type === "order_task" && n.ref_id) {
+    if (n.ref_type) {
       setOpen(false);
-      navigate({ to: "/dashboard/orders/$orderId", params: { orderId: n.ref_id } });
-      return;
-    }
-    if (n.ref_type === "leave_request" && n.rule_code !== "leave_requested") {
-      setOpen(false);
-      navigate({ to: "/clock", search: { leave: "1" } });
-      return;
-    }
-    if (n.ref_type === "payroll") {
-      setOpen(false);
-      navigate({ to: "/clock", search: { pay: "1" } });
-      return;
-    }
-    const to = n.ref_type ? REF_ROUTE[n.ref_type] : undefined;
-    if (to) {
-      setOpen(false);
-      navigate({ to });
+      await goToNotification(n, navigate);
     }
   };
 

@@ -58,6 +58,7 @@ type ReconRow = {
 
 const LINK_STATUSES: ReadonlyArray<readonly [string, string]> = [
   ["dispatched", "已發派"],
+  ["accepted", "對方已接單"],
   ["in_progress", "進行中"],
   ["completed", "已完成"],
   ["rejected", "已拒絕"],
@@ -66,6 +67,7 @@ const LINK_STATUSES: ReadonlyArray<readonly [string, string]> = [
 
 const LINK_STATUS_CLASS: Record<string, string> = {
   dispatched: "bg-blue-100 text-blue-800 border-blue-200",
+  accepted: "bg-blue-100 text-blue-800 border-blue-200",
   in_progress: "bg-amber-100 text-amber-800 border-amber-200",
   completed: "bg-green-100 text-green-800 border-green-200",
   rejected: "bg-red-100 text-red-800 border-red-200",

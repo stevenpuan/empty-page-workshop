@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Bell, CheckCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { RULE_LABEL, goToNotification } from "@/lib/notification-route";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
 import { fmtDateTime } from "@/lib/dates";
@@ -33,27 +34,9 @@ const LINE_LABEL: Record<string, string> = {
   digest: "LINE 彙整",
 };
 
-
-const RULE_LABEL: Record<string, string> = {
-  task_overdue: "工序逾期",
-  order_overdue: "訂單逾期",
-  payable_due_soon: "應付到期提醒",
-  payable_overdue: "應付逾期",
-  receivable_due_soon: "應收到期提醒",
-  receivable_overdue: "應收逾期",
-  clock_in_missing: "未打上班卡",
-  abnormal_location: "異常打卡",
-  approval_pending: "補卡待審",
-  outsource_dispatched: "收到發包",
-  outsource_completed: "外包完成",
-  outsource_rejected: "外包被拒接",
-  outsource_amount_adjusted: "外包金額調整",
-  account_created: "帳號建立",
-  system_alert: "系統通知",
-};
-
 function Page() {
   const { employee, permsLoaded } = useAuth();
+  const navigate = useNavigate();
   const empId = employee?.id;
   const [items, setItems] = useState<Notif[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,7 +93,7 @@ function Page() {
       }
       setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
     }
-    // S3 起依 ref_type 導頁（order/task/payable…）
+    await goToNotification(n, navigate);
   };
 
   const unread = items.filter((n) => !n.is_read).length;

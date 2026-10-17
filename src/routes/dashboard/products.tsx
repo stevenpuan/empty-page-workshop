@@ -73,14 +73,15 @@ interface Template {
 }
 type Draft = Partial<Product>;
 
+// 值要和資料庫 CHECK（products.category）一致：存的就是中文
 const CATEGORIES: ReadonlyArray<readonly [string, string]> = [
-  ["business_card", "名片"],
-  ["banner", "布條帆布"],
-  ["postcard_dm", "明信片DM"],
-  ["pure_print", "純代印"],
-  ["paper_box", "紙盒"],
-  ["sticker", "貼紙"],
-  ["other", "其他"],
+  ["名片", "名片"],
+  ["布條帆布", "布條帆布"],
+  ["明信片DM", "明信片DM"],
+  ["純代印", "純代印"],
+  ["紙盒", "紙盒"],
+  ["貼紙", "貼紙"],
+  ["其他", "其他"],
 ];
 const categoryLabel = (v: string | null | undefined) =>
   CATEGORIES.find(([k]) => k === v)?.[1] ?? v ?? "—";
@@ -88,7 +89,7 @@ const categoryLabel = (v: string | null | undefined) =>
 const blank = (): Draft => ({
   product_code: "",
   name: "",
-  category: "other",
+  category: "其他",
   spec_template: "",
   unit: "張",
   default_routing_template_id: null,
@@ -151,7 +152,7 @@ function Page() {
       company_id: company.id,
       product_code: form.product_code.trim(),
       name: form.name.trim(),
-      category: form.category || "other",
+      category: form.category || "其他",
       spec_template: form.spec_template?.trim() || null,
       unit: form.unit?.trim() || "張",
       default_routing_template_id: form.default_routing_template_id || null,
@@ -270,7 +271,7 @@ function Page() {
                 <div className="space-y-1">
                   <Label>品項類別</Label>
                   <Select
-                    value={form.category ?? "other"}
+                    value={form.category ?? "其他"}
                     onValueChange={(v) =>
                       setForm({
                         ...form,

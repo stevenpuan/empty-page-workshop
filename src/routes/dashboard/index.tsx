@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Bell, KeyRound, Building2, ClipboardList, KanbanSquare, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { humanizeError } from "@/lib/app-error";
 import { useAuth } from "@/lib/auth";
 import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -129,18 +130,17 @@ function Home() {
   });
 
   useBoardRealtime();
-  // board_stats view：還沒有訂單（或 view 尚未建立）時顯示全零，不擋畫面
-  const { data: board = ZERO_STATS } = useQuery({
+  // board_stats view：沒有訂單時是全零；讀取失敗要顯示錯誤，不可假裝是 0
+  const { data: board = ZERO_STATS, error: boardErr } = useQuery({
     queryKey: ["board_stats", company?.id],
     enabled: !!company?.id,
-    retry: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("board_stats")
         .select("*")
         .eq("company_id", company!.id)
         .maybeSingle();
-      if (error) return ZERO_STATS;
+      if (error) throw error;
       return { ...ZERO_STATS, ...(data ?? {}) } as BoardStats;
     },
   });
@@ -148,6 +148,9 @@ function Home() {
   const name = employee?.name ?? profile?.display_name ?? "";
   return (
     <div className="space-y-6">
+      {!!boardErr && (
+        <p className="text-sm text-destructive">{humanizeError(boardErr, "載入派工統計")}</p>
+      )}
       <PageHeader
         title={`歡迎回來，${name}`}
         description={`${company?.name ?? ""} · 角色：${isPlatformAdmin && !employee ? "系統維護" : (employee?.role?.name ?? "—")}`}
