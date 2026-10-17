@@ -1,6 +1,6 @@
 -- 祥興／沂融 完整回歸測試（含 019–028 新功能）
 -- 在單一交易內建立 6 個測試帳號與資料，以各角色身分呼叫資料庫，最後 ROLLBACK，不留任何資料。
--- 用法：Supabase SQL Editor 整段貼上執行。2026-10-16 結果：98/98 通過（028 應收應付補齊後）。
+-- 用法：Supabase SQL Editor 整段貼上執行。2026-10-17 結果：98/98 通過（034 安全補強後；030 起產品預設流程為三步）。
 begin;
 create temp table _t(n serial, grp text, test text, expect text, actual text, pass boolean) on commit drop;
 grant all on _t to authenticated, anon;
@@ -391,7 +391,7 @@ begin
     insert into orders(company_id, customer_id, product_id, item_name, qty, unit, amount_untaxed, tax_amount, due_date, status)
     values (XX, CUST, P_CARD, 'TEST 新流程名片', 5, '盒', 1000, null, current_date + 10, 'active') returning id into o3;
     select count(*) into v_n from order_tasks where order_id = o3;
-    insert into _t(grp,test,expect,actual,pass) values ('N','訂單未選範本→依產品預設範本展開','8 道', v_n||' 道', v_n = 8);
+    insert into _t(grp,test,expect,actual,pass) values ('N','訂單未選範本→依產品預設範本展開（030 起預設三步）','3 道', v_n||' 道', v_n = 3);
     select amount_total into v_num from orders where id = o3;
     insert into _t(grp,test,expect,actual,pass) values ('N','訂單含稅金額由 DB 計算（1000＋5%）','1050', v_num::text, v_num = 1050);
 
@@ -405,8 +405,8 @@ begin
     values (XX, CUST, P_CARD, 'TEST 草稿', 1, 500, 25, current_date + 7, 'draft') returning id into o4;
     perform public.set_order_status(o4, 'active');
     select count(*) into v_n from order_tasks where order_id = o4;
-    insert into _t(grp,test,expect,actual,pass) values ('N','set_order_status 草稿→確認並展開工序','active／8 道',
-      (select status from orders where id = o4)||'／'||v_n||' 道', v_n = 8);
+    insert into _t(grp,test,expect,actual,pass) values ('N','set_order_status 草稿→確認並展開工序','active／3 道',
+      (select status from orders where id = o4)||'／'||v_n||' 道', v_n = 3);
     begin
       perform public.set_order_status(o4, 'closed');
       insert into _t(grp,test,expect,actual,pass) values ('N','不合法狀態轉換 active→closed','擋下','未擋', false);
