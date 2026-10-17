@@ -41,6 +41,7 @@ const REF_ROUTE: Record<string, string> = {
   payable: "/dashboard/payables",
   receivable: "/dashboard/receivables",
   employee: "/dashboard/settings/employees",
+  quotation: "/dashboard/quotations",
 };
 
 /** 側欄鈴鐺＋通知中心下拉面板：未讀數、Realtime 訂閱、標記已讀、導航 */

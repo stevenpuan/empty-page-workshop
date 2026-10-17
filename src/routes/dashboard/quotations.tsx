@@ -17,6 +17,14 @@ import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
 import { taipeiToday, fmtDate, formatTWD } from "@/lib/dates";
 import { RequirePerm } from "@/components/RequirePerm";
+import { usePriceList, type PriceList } from "@/lib/price-list";
+import {
+  QuoteLineEditor,
+  newLine,
+  lineAmount,
+  linePayload,
+  type QuoteLine,
+} from "@/components/quotation/QuoteLineEditor";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -85,6 +93,15 @@ interface QuotationItem {
   unit_price: number;
   amount: number;
   sort_order: number;
+  price_category_id?: string | null;
+  price_category?: string | null;
+  price_item?: string | null;
+  price_option?: string | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  addons?: { id: string; count?: number }[] | null;
+  suggested_amount?: number | null;
+  price_detail?: unknown;
 }
 interface Quotation {
   id: string;
@@ -99,6 +116,8 @@ interface Quotation {
   tax_amount: number;
   total: number;
   note: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
   created_at: string;
   order_id: string | null;
   customer?: { name: string; customer_code: string } | null;
@@ -152,9 +171,10 @@ function calcTax(subtotal: number, taxType: string) {
 }
 
 const QUOTATION_COLUMNS =
-  "id, company_id, quote_no, customer_id, quote_date, valid_until, status, subtotal, tax_type, tax_amount, total, note, created_at, order_id, " +
+  "id, company_id, quote_no, customer_id, quote_date, valid_until, status, subtotal, tax_type, tax_amount, total, note, contact_name, contact_phone, created_at, order_id, " +
   "customer:customers(name, customer_code), " +
-  "items:quotation_items(id, quotation_id, item_name, spec, qty, unit, unit_price, amount, sort_order)";
+  "items:quotation_items(id, quotation_id, item_name, spec, qty, unit, unit_price, amount, sort_order, " +
+  "price_category_id, price_category, price_item, price_option, width_cm, height_cm, addons, suggested_amount, price_detail)";
 
 /** 報價單狀態只能透過 set_quotation_status RPC 轉換（直接 update status 會被 DB 擋下 P0007） */
 async function setQuotationStatus(id: string, status: string, ctx: string): Promise<boolean> {
@@ -276,7 +296,10 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="報價單" description="建立報價單、追蹤報價狀態、標記為已報價或已接受。" />
+      <PageHeader
+        title="報價單"
+        description="選品項、填數量或尺寸，系統依「價目設定」帶出建議價，可以改價。送出報價時老闆的 LINE 會收到通知，有改價的會標出來。"
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="w-40">
@@ -371,7 +394,14 @@ function Page() {
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">{q.quote_no}</TableCell>
-                    <TableCell className="font-medium">{q.customer?.name ?? "—"}</TableCell>
+                    <TableCell className="font-medium">
+                      {q.customer?.name ?? "—"}
+                      {q.contact_name && (
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          {q.contact_name}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm">{fmtDate(q.quote_date)}</TableCell>
                     <TableCell className="text-sm">{fmtDate(q.valid_until)}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
@@ -570,10 +600,15 @@ function QuotationDetail({ quotation }: { quotation: Quotation }) {
     <div className="py-3 space-y-3">
       <div className="flex flex-wrap gap-4 text-sm">
         <span>稅別：{TAX_LABEL[quotation.tax_type] ?? quotation.tax_type}</span>
-        <span>小計：{formatTWD(quotation.subtotal)}</span>
+        <span>未稅：{formatTWD(quotation.subtotal)}</span>
         <span>稅額：{formatTWD(quotation.tax_amount)}</span>
-        <span className="font-medium">合計：{formatTWD(quotation.total)}</span>
+        <span className="font-medium">含稅合計：{formatTWD(quotation.total)}</span>
       </div>
+      {(quotation.contact_name || quotation.contact_phone) && (
+        <p className="text-sm">
+          聯絡人：{[quotation.contact_name, quotation.contact_phone].filter(Boolean).join(" ")}
+        </p>
+      )}
       {quotation.note && <p className="text-sm text-muted-foreground">備註：{quotation.note}</p>}
       {items.length > 0 && (
         <Table>
@@ -586,6 +621,7 @@ function QuotationDetail({ quotation }: { quotation: Quotation }) {
               <TableHead>單位</TableHead>
               <TableHead className="text-right">單價</TableHead>
               <TableHead className="text-right">金額</TableHead>
+              <TableHead className="text-right">建議價</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -604,6 +640,9 @@ function QuotationDetail({ quotation }: { quotation: Quotation }) {
                   <TableCell className="text-right tabular-nums font-medium">
                     {formatTWD(it.amount)}
                   </TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">
+                    <SuggestedCell item={it} />
+                  </TableCell>
                 </TableRow>
               ))}
           </TableBody>
@@ -613,16 +652,58 @@ function QuotationDetail({ quotation }: { quotation: Quotation }) {
   );
 }
 
+/** 明細的建議價欄：照建議價／改低改高／自填 */
+function SuggestedCell({ item }: { item: QuotationItem }) {
+  if (!item.price_detail) return <span className="text-muted-foreground">自己填</span>;
+  if (item.suggested_amount === null || item.suggested_amount === undefined)
+    return <span className="text-amber-700 dark:text-amber-400">需老闆報價</span>;
+  const diff = Math.round(num(item.amount)) - Math.round(num(item.suggested_amount));
+  if (diff === 0) return <span className="text-muted-foreground">照建議價</span>;
+  return (
+    <span className="text-amber-700 dark:text-amber-400">
+      {formatTWD(item.suggested_amount)}（{diff < 0 ? "改低" : "改高"} {formatTWD(Math.abs(diff))}）
+    </span>
+  );
+}
+
 /* ---- create / edit dialog ---- */
-const blankItem = (): QuotationItem => ({
-  item_name: "",
-  spec: null,
-  qty: 1,
-  unit: "式",
-  unit_price: 0,
-  amount: 0,
-  sort_order: 0,
-});
+const WALKIN = "__walkin__";
+
+/** 已存的明細 → 編輯用的明細 */
+function toLine(it: QuotationItem, pl: PriceList | undefined): QuoteLine {
+  const base = newLine("free");
+  const cat = it.price_category_id
+    ? pl?.categories.find((c) => c.id === it.price_category_id)
+    : undefined;
+  if (cat) {
+    const sugg =
+      it.suggested_amount === null || it.suggested_amount === undefined
+        ? null
+        : num(it.suggested_amount);
+    return {
+      ...base,
+      kind: "price",
+      category_id: cat.id,
+      item: it.price_item ?? it.item_name,
+      option: it.price_option ?? "",
+      qty: String(num(it.qty)),
+      width: it.width_cm ? String(num(it.width_cm)) : "",
+      height: it.height_cm ? String(num(it.height_cm)) : "",
+      addons: Object.fromEntries((it.addons ?? []).map((a) => [a.id, String(a.count ?? 1)])),
+      amount: String(num(it.amount)),
+      touched: sugg === null || Math.round(sugg) !== Math.round(num(it.amount)),
+      suggested: sugg,
+    };
+  }
+  return {
+    ...base,
+    item_name: it.item_name,
+    spec: it.spec ?? "",
+    qty: String(num(it.qty)),
+    unit: it.unit ?? "式",
+    unit_price: String(num(it.unit_price)),
+  };
+}
 
 function QuotationDialog({
   open,
@@ -635,187 +716,142 @@ function QuotationDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { company, user } = useAuth();
+  const { company } = useAuth();
   const { data: customers = [] } = useCustomers(company?.id);
+  const { data: priceList } = usePriceList(company?.id);
   const isEdit = !!editTarget;
 
   const [customerId, setCustomerId] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [quoteDate, setQuoteDate] = useState(taipeiToday());
   const [validUntil, setValidUntil] = useState("");
   const [taxType, setTaxType] = useState("taxable");
   const [note, setNote] = useState("");
-  const [items, setItems] = useState<QuotationItem[]>([blankItem()]);
+  const [lines, setLines] = useState<QuoteLine[]>(() => [newLine()]);
   const [saving, setSaving] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
-  // load edit target
-  const loadEdit = () => {
-    if (editTarget) {
-      setCustomerId(editTarget.customer_id);
+  // 打開編輯時載入一次（等價目載入後才轉換，才認得出大類）
+  const loadKey = open ? (editTarget ? `${editTarget.id}:${priceList ? 1 : 0}` : "new") : null;
+  if (loadKey !== loadedFor) {
+    setLoadedFor(loadKey);
+    if (open && editTarget) {
+      const walkin =
+        customers.find((c) => c.id === editTarget.customer_id)?.customer_code === "WALKIN";
+      setCustomerId(walkin ? WALKIN : editTarget.customer_id);
+      setContactName(editTarget.contact_name ?? "");
+      setContactPhone(editTarget.contact_phone ?? "");
       setQuoteDate(editTarget.quote_date);
       setValidUntil(editTarget.valid_until ?? "");
       setTaxType(editTarget.tax_type);
       setNote(editTarget.note ?? "");
-      setItems(
-        (editTarget.items ?? []).length > 0
-          ? (editTarget.items ?? []).sort((a, b) => a.sort_order - b.sort_order)
-          : [blankItem()],
-      );
+      const its = [...(editTarget.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+      setLines(its.length ? its.map((it) => toLine(it, priceList)) : [newLine()]);
+    } else if (open) {
+      setCustomerId("");
+      setContactName("");
+      setContactPhone("");
+      setQuoteDate(taipeiToday());
+      setValidUntil("");
+      setTaxType("taxable");
+      setNote("");
+      setLines([newLine((priceList?.categories.length ?? 0) > 0 || !priceList ? "price" : "free")]);
     }
-  };
+  }
 
-  const reset = () => {
-    setCustomerId("");
-    setQuoteDate(taipeiToday());
-    setValidUntil("");
-    setTaxType("taxable");
-    setNote("");
-    setItems([blankItem()]);
-  };
-
-  // recalc
-  const subtotal = useMemo(() => items.reduce((s, it) => s + num(it.amount), 0), [items]);
+  const subtotal = Math.round(lines.reduce((s, l) => s + lineAmount(l), 0));
   const taxAmount = calcTax(subtotal, taxType);
   const total = subtotal + taxAmount;
+  const flagged = lines.filter(
+    (l) =>
+      l.kind === "free" ||
+      l.suggested === null ||
+      Math.round(num(l.amount)) !== Math.round(l.suggested),
+  ).length;
 
-  const updateItem = (idx: number, patch: Partial<QuotationItem>) => {
-    setItems((prev) => {
-      const next = [...prev];
-      const cur = { ...next[idx], ...patch } as QuotationItem;
-      cur.amount = num(cur.qty) * num(cur.unit_price);
-      next[idx] = cur;
-      return next;
-    });
-  };
-  const addItem = () => setItems((prev) => [...prev, { ...blankItem(), sort_order: prev.length }]);
-  const removeItem = (idx: number) =>
-    setItems((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  const updateLine = (key: string, patch: Partial<QuoteLine>) =>
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  const submit = async () => {
+  const submit = async (send: boolean) => {
     if (!company) return;
     if (!customerId) {
-      toast.error("請選擇客戶");
+      toast.error("請選擇客戶（現場客人選「散客」）");
       return;
     }
-    const validItems = items.filter((it) => it.item_name.trim());
-    if (validItems.length === 0) {
-      toast.error("請至少填寫一筆報價明細");
+    const payload = [];
+    for (const [i, l] of lines.entries()) {
+      const p = linePayload(l, priceList);
+      const blank = l.kind === "free" ? !l.item_name.trim() : !l.category_id;
+      if (blank) {
+        if (lines.length === 1) {
+          toast.error("請至少填一筆報價明細");
+          return;
+        }
+        continue;
+      }
+      if (!p.item_name) {
+        toast.error(`第 ${i + 1} 筆請選品項或填品名`);
+        return;
+      }
+      if (num(l.qty) <= 0) {
+        toast.error(`第 ${i + 1} 筆的數量要大於 0`);
+        return;
+      }
+      if (l.kind === "price" && l.amount.trim() === "") {
+        toast.error(`第 ${i + 1} 筆請填報價金額`);
+        return;
+      }
+      payload.push(p);
+    }
+    if (payload.length === 0) {
+      toast.error("請至少填一筆報價明細");
       return;
     }
     setSaving(true);
     try {
-      if (isEdit && editTarget) {
-        // update quotation header
-        const { data: updated, error: hErr } = await supabase
-          .from("quotations")
-          .update({
-            customer_id: customerId,
-            quote_date: quoteDate,
-            valid_until: validUntil || null,
-            tax_type: taxType,
-            // subtotal / tax_amount / total 由 DB trigger 依明細計算，前端不送
-            note: note.trim() || null,
-            updated_at: new Date().toISOString(),
-            updated_by: user?.id ?? null,
-          })
-          .eq("id", editTarget.id)
-          .select("id");
-        if (hErr) throw hErr;
-        if (!updated?.length) throw new Error("沒有寫入任何資料（可能沒有權限）");
-
-        // delete old items, insert new
-        const { error: dErr } = await supabase
-          .from("quotation_items")
-          .delete()
-          .eq("quotation_id", editTarget.id);
-        if (dErr) throw dErr;
-        const { error: iErr } = await supabase.from("quotation_items").insert(
-          validItems.map((it, i) => ({
-            quotation_id: editTarget.id,
-            item_name: it.item_name.trim(),
-            spec: it.spec?.trim() || null,
-            qty: num(it.qty),
-            unit: it.unit?.trim() || "式",
-            unit_price: num(it.unit_price),
-            // amount 由 DB trigger 計算（qty × unit_price）
-            sort_order: i,
-          })),
-        );
-        if (iErr) throw iErr;
-        toast.success("已更新報價單");
-      } else {
-        // generate quote_no via next_doc_no
-        const { data: noData, error: noErr } = await supabase.rpc("next_doc_no", {
-          p_company_id: company.id,
-          p_doc_type: "QT",
-        });
-        if (noErr) throw noErr;
-        const quoteNo = noData as string;
-
-        const { data: inserted, error: hErr } = await supabase
-          .from("quotations")
-          .insert({
-            company_id: company.id,
-            quote_no: quoteNo,
-            customer_id: customerId,
-            quote_date: quoteDate,
-            valid_until: validUntil || null,
-            tax_type: taxType,
-            // subtotal / tax_amount / total 由 DB trigger 依明細計算，前端不送
-            note: note.trim() || null,
-            created_by: user?.id ?? null,
-            updated_by: user?.id ?? null,
-          })
-          .select("id")
-          .single();
-        if (hErr) throw hErr;
-
-        const { error: iErr } = await supabase.from("quotation_items").insert(
-          validItems.map((it, i) => ({
-            quotation_id: inserted.id,
-            item_name: it.item_name.trim(),
-            spec: it.spec?.trim() || null,
-            qty: num(it.qty),
-            unit: it.unit?.trim() || "式",
-            unit_price: num(it.unit_price),
-            // amount 由 DB trigger 計算（qty × unit_price）
-            sort_order: i,
-          })),
-        );
-        if (iErr) throw iErr;
-        toast.success(`已建立報價單 ${quoteNo}`);
-      }
-      reset();
+      const { data, error } = await supabase.rpc("save_quotation", {
+        p_id: editTarget?.id ?? null,
+        p_header: {
+          customer_id: customerId === WALKIN ? null : customerId,
+          contact_name: contactName,
+          contact_phone: contactPhone,
+          quote_date: quoteDate,
+          valid_until: validUntil,
+          tax_type: taxType,
+          note,
+        },
+        p_items: payload,
+        p_send: send,
+      });
+      if (error) throw error;
+      const res = data as { ok?: boolean; quote_no?: string } | null;
+      if (!res?.ok) throw new Error("沒有寫入任何資料（可能沒有權限）");
+      toast.success(
+        send
+          ? `已送出報價 ${res.quote_no ?? ""}，老闆會收到通知`
+          : `已存草稿 ${res.quote_no ?? ""}`,
+      );
       onClose();
       onSaved();
     } catch (e) {
-      toast.error(humanizeError(e, isEdit ? "更新報價單" : "建立報價單"));
+      toast.error(humanizeError(e, send ? "送出報價" : "儲存報價單"));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) {
-          reset();
-          onClose();
-        } else if (editTarget) {
-          loadEdit();
-        }
-      }}
-    >
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "編輯報價單" : "新增報價單"}</DialogTitle>
+          <DialogTitle>{isEdit ? `編輯報價單 ${editTarget?.quote_no}` : "新增報價單"}</DialogTitle>
           <DialogDescription>
-            {isEdit ? `編輯 ${editTarget?.quote_no}` : "填寫報價明細，系統自動計算稅額與合計。"}
+            選品項、填數量或尺寸，系統帶出建議價（未稅）；金額可以改。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* header fields */}
           <div className="grid gap-3 sm:grid-cols-4">
             <div className="space-y-1 sm:col-span-2">
               <Label>客戶 *</Label>
@@ -824,13 +860,28 @@ function QuotationDialog({
                   <SelectValue placeholder="選擇客戶" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value={WALKIN}>散客（現場客人，下面填姓名電話）</SelectItem>
+                  {customers
+                    .filter((c) => c.customer_code !== "WALKIN" || c.id === customerId)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>聯絡人</Label>
+              <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>電話</Label>
+              <Input
+                inputMode="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label>報價日期 *</Label>
@@ -844,126 +895,70 @@ function QuotationDialog({
                 onChange={(e) => setValidUntil(e.target.value)}
               />
             </div>
+            <div className="space-y-1">
+              <Label>稅別</Label>
+              <Select value={taxType} onValueChange={setTaxType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="taxable">應稅 5%</SelectItem>
+                  <SelectItem value="zero_tax">零稅率</SelectItem>
+                  <SelectItem value="tax_free">免稅</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="w-48">
-            <Label>稅別</Label>
-            <Select value={taxType} onValueChange={setTaxType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="taxable">應稅 5%</SelectItem>
-                <SelectItem value="zero_tax">零稅率</SelectItem>
-                <SelectItem value="tax_free">免稅</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* items */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>報價明細</Label>
-              <Button type="button" size="sm" variant="outline" onClick={addItem}>
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                增加項目
+            <Label>報價明細</Label>
+            {lines.map((l, i) => (
+              <QuoteLineEditor
+                key={l.key}
+                index={i}
+                line={l}
+                priceList={priceList}
+                canRemove={lines.length > 1}
+                onChange={(patch) => updateLine(l.key, patch)}
+                onRemove={() => setLines((prev) => prev.filter((x) => x.key !== l.key))}
+              />
+            ))}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setLines((p) => [...p, newLine()])}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                從價目表加一筆
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setLines((p) => [...p, newLine("free")])}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                自己填一筆
               </Button>
             </div>
-            <div className="border rounded-md overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8">#</TableHead>
-                    <TableHead>品名 *</TableHead>
-                    <TableHead>規格</TableHead>
-                    <TableHead className="w-24 text-right">數量</TableHead>
-                    <TableHead className="w-20">單位</TableHead>
-                    <TableHead className="w-28 text-right">單價</TableHead>
-                    <TableHead className="w-28 text-right">金額</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((it, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell>
-                        <Input
-                          value={it.item_name}
-                          onChange={(e) => updateItem(idx, { item_name: e.target.value })}
-                          placeholder="品名"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={it.spec ?? ""}
-                          onChange={(e) => updateItem(idx, { spec: e.target.value })}
-                          placeholder="規格"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="text-right"
-                          value={it.qty}
-                          onChange={(e) => updateItem(idx, { qty: Number(e.target.value) || 0 })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={it.unit ?? ""}
-                          onChange={(e) => updateItem(idx, { unit: e.target.value })}
-                          className="w-16"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="text-right"
-                          value={it.unit_price}
-                          onChange={(e) =>
-                            updateItem(idx, { unit_price: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {formatTWD(it.amount)}
-                      </TableCell>
-                      <TableCell>
-                        {items.length > 1 && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive h-8 w-8 p-0"
-                            onClick={() => removeItem(idx)}
-                          >
-                            ×
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
           </div>
 
-          {/* totals */}
           <div className="flex flex-col items-end gap-1 border-t pt-3 text-sm">
             <div className="flex gap-3">
-              <span className="text-muted-foreground">小計</span>
-              <span className="tabular-nums w-28 text-right">{formatTWD(subtotal)}</span>
+              <span className="text-muted-foreground">未稅金額</span>
+              <span className="w-28 text-right tabular-nums">{formatTWD(subtotal)}</span>
             </div>
             <div className="flex gap-3">
-              <span className="text-muted-foreground">稅額</span>
-              <span className="tabular-nums w-28 text-right">{formatTWD(taxAmount)}</span>
+              <span className="text-muted-foreground">
+                稅額{taxType === "taxable" ? "（5%）" : ""}
+              </span>
+              <span className="w-28 text-right tabular-nums">{formatTWD(taxAmount)}</span>
             </div>
             <div className="flex gap-3 text-base font-bold">
-              <span>合計</span>
-              <span className="tabular-nums w-28 text-right">{formatTWD(total)}</span>
+              <span>含稅合計</span>
+              <span className="w-28 text-right tabular-nums">{formatTWD(total)}</span>
             </div>
           </div>
 
@@ -973,18 +968,21 @@ function QuotationDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-          >
+        <DialogFooter className="gap-2 sm:items-center">
+          {flagged > 0 && (
+            <p className="mr-auto text-xs text-muted-foreground">
+              有 {flagged} 筆改過價或自己填價，送出時會一起通知老闆
+            </p>
+          )}
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             取消
           </Button>
-          <Button onClick={submit} disabled={saving}>
-            {saving ? "送出中…" : isEdit ? "更新報價" : "建立報價"}
+          <Button variant="secondary" onClick={() => void submit(false)} disabled={saving}>
+            存草稿
+          </Button>
+          <Button onClick={() => void submit(true)} disabled={saving}>
+            <Send className="mr-1 h-4 w-4" />
+            {saving ? "送出中…" : "送出報價"}
           </Button>
         </DialogFooter>
       </DialogContent>
