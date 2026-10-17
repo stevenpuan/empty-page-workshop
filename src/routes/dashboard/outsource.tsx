@@ -60,6 +60,7 @@ const PAGE_SIZE = 30;
 
 const STATUSES: ReadonlyArray<readonly [string, string]> = [
   ["dispatched", "已發派"],
+  ["accepted", "對方已接單"],
   ["in_progress", "進行中"],
   ["completed", "已完成"],
   ["rejected", "已拒絕"],
@@ -68,6 +69,7 @@ const STATUSES: ReadonlyArray<readonly [string, string]> = [
 
 const STATUS_CLASS: Record<string, string> = {
   dispatched: "bg-blue-100 text-blue-800 border-blue-200",
+  accepted: "bg-blue-100 text-blue-800 border-blue-200",
   in_progress: "bg-amber-100 text-amber-800 border-amber-200",
   completed: "bg-green-100 text-green-800 border-green-200",
   rejected: "bg-red-100 text-red-800 border-red-200",
@@ -99,13 +101,42 @@ interface LinkRow {
 
 interface EventRow {
   id: string;
-  event_type: string;
+  event: string;
   created_at: string;
   actor_company_id: string | null;
   payload: unknown;
 }
 
 const EMPTY_LINKS: LinkRow[] = [];
+
+const EVENT_LABEL: Record<string, string> = {
+  dispatch: "派出",
+  accept: "接單",
+  progress: "製作中",
+  complete: "完成",
+  reject: "退回",
+  cancel: "取消",
+  amount_adjust: "調整金額",
+};
+
+/** 事件內容轉成看得懂的文字（金額、原因、交期） */
+function eventDetail(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const p = payload as Record<string, unknown>;
+  const parts: string[] = [];
+  const money = (v: unknown) => `$${Number(v).toLocaleString("zh-TW")}`;
+  if (p["old_amount"] !== undefined && p["new_amount"] !== undefined)
+    parts.push(`金額 ${money(p["old_amount"])} → ${money(p["new_amount"])}`);
+  else if (p["amount"] !== undefined) parts.push(`金額 ${money(p["amount"])}`);
+  if (p["station"]) parts.push(`工序 ${String(p["station"])}`);
+  if (p["to_order_no"]) parts.push(`對方工單 ${String(p["to_order_no"])}`);
+  if (p["due_date"]) parts.push(`交期 ${String(p["due_date"])}`);
+  if (p["payable_no"]) parts.push(`應付 ${String(p["payable_no"])}`);
+  if (p["receivable_no"]) parts.push(`應收 ${String(p["receivable_no"])}`);
+  if (p["reason"]) parts.push(`原因：${String(p["reason"])}`);
+  if (p["note"]) parts.push(`備註：${String(p["note"])}`);
+  return parts.join("，");
+}
 
 interface Stats {
   dispatched_count: number;
@@ -153,7 +184,7 @@ function Page() {
         )
         .eq("from_company_id", companyId!)
         .maybeSingle();
-      if (error) return ZERO_STATS;
+      if (error) throw error;
       return { ...ZERO_STATS, ...(data as Partial<Stats> | null) };
     },
   });
@@ -238,6 +269,9 @@ function Page() {
         }
       />
 
+      {!!statsQ.error && (
+        <p className="text-sm text-destructive">{humanizeError(statsQ.error, "載入外包統計")}</p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="進行中"
@@ -361,7 +395,7 @@ function Page() {
               ) : linksQ.isError ? (
                 <TableRow>
                   <TableCell colSpan={11} className="py-10 text-center text-muted-foreground">
-                    外包資料尚未啟用
+                    {humanizeError(linksQ.error, "載入外包資料")}
                   </TableCell>
                 </TableRow>
               ) : links.length === 0 ? (
@@ -550,12 +584,13 @@ function LinkDetail({
   canCancel: boolean;
   onCancel: () => void;
 }) {
+  const { companies } = useAuth();
   const eventsQ = useQuery({
     queryKey: ["cross_company_events", link.id],
     queryFn: async (): Promise<EventRow[]> => {
       const { data, error } = await supabase
         .from("cross_company_events")
-        .select("id, event_type, created_at, actor_company_id, payload")
+        .select("id, event, created_at, actor_company_id, payload")
         .eq("link_id", link.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -580,7 +615,7 @@ function LinkDetail({
       {eventsQ.isLoading ? (
         <p className="text-sm text-muted-foreground">載入中…</p>
       ) : eventsQ.isError ? (
-        <p className="text-sm text-muted-foreground">事件紀錄尚未啟用</p>
+        <p className="text-sm text-destructive">{humanizeError(eventsQ.error, "載入事件紀錄")}</p>
       ) : (eventsQ.data ?? []).length === 0 ? (
         <p className="text-sm text-muted-foreground">尚無事件</p>
       ) : (
@@ -588,13 +623,14 @@ function LinkDetail({
           {(eventsQ.data ?? []).map((e) => (
             <li key={e.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">{fmtDateTime(e.created_at)}</span>
-              <Badge variant="outline">{e.event_type}</Badge>
+              <Badge variant="outline">{EVENT_LABEL[e.event] ?? e.event}</Badge>
               <span className="text-muted-foreground">
-                操作方 {e.actor_company_id ? e.actor_company_id.slice(0, 8) : "—"}
+                操作方{" "}
+                {companies.find((c) => c.id === e.actor_company_id)?.short_name ??
+                  companies.find((c) => c.id === e.actor_company_id)?.name ??
+                  "—"}
               </span>
-              <span className="truncate text-muted-foreground">
-                {e.payload ? JSON.stringify(e.payload).slice(0, 120) : ""}
-              </span>
+              <span className="truncate text-muted-foreground">{eventDetail(e.payload)}</span>
             </li>
           ))}
         </ul>

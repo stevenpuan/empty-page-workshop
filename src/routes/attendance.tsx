@@ -284,7 +284,7 @@ function DailyTab({ onGoAmend }: { onGoAmend: () => void }) {
       <CardContent>
         {error ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            出勤報表尚未啟用（{humanizeError(error, "讀取出勤")}）
+            {humanizeError(error, "讀取出勤")}
           </p>
         ) : isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">載入中…</p>
@@ -499,7 +499,7 @@ function AmendTab() {
       <CardContent className="space-y-3">
         {error ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            補卡功能尚未啟用（{humanizeError(error, "讀取補卡申請")}）
+            {humanizeError(error, "讀取補卡申請")}
           </p>
         ) : isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">載入中…</p>
@@ -719,7 +719,7 @@ function MonthlyTab() {
       <CardContent>
         {error ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            月報表尚未啟用（{humanizeError(error, "讀取月報表")}）
+            {humanizeError(error, "讀取月報表")}
           </p>
         ) : isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">載入中…</p>

@@ -117,8 +117,8 @@ interface LinkRow {
 interface LogRow {
   id: string;
   created_at: string;
-  from_status: string | null;
-  to_status: string | null;
+  old_status: string | null;
+  new_status: string | null;
   reason: string | null;
   employees: { name: string } | null;
 }
@@ -222,7 +222,7 @@ function Page() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("order_task_logs")
-        .select("id, created_at, from_status, to_status, reason, employees:actor_employee_id(name)")
+        .select("id, created_at, old_status, new_status, reason, employees:changed_by(name)")
         .eq("order_id", orderId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -543,7 +543,7 @@ function Page() {
         </button>
         {showLogs &&
           (logErr ? (
-            <p className="text-sm text-muted-foreground">工序日誌尚未啟用。</p>
+            <p className="text-sm text-destructive">{humanizeError(logErr, "載入工序日誌")}</p>
           ) : logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">目前沒有紀錄。</p>
           ) : (
@@ -564,8 +564,8 @@ function Page() {
                         <TableCell className="whitespace-nowrap">{fmtDateTime(l.created_at)}</TableCell>
                         <TableCell>{l.employees?.name ?? "—"}</TableCell>
                         <TableCell>
-                          {(TASK_STATUS_LABEL[l.from_status ?? ""] ?? l.from_status ?? "—")} →{" "}
-                          {(TASK_STATUS_LABEL[l.to_status ?? ""] ?? l.to_status ?? "—")}
+                          {(TASK_STATUS_LABEL[l.old_status ?? ""] ?? l.old_status ?? "—")} →{" "}
+                          {(TASK_STATUS_LABEL[l.new_status ?? ""] ?? l.new_status ?? "—")}
                         </TableCell>
                         <TableCell>{l.reason ?? "—"}</TableCell>
                       </TableRow>
@@ -646,11 +646,12 @@ function Page() {
 }
 
 const LINK_STATUS_LABEL: Record<string, string> = {
-  pending: "待對方接單",
+  dispatched: "已發派，待對方接單",
   accepted: "對方已接單",
   in_progress: "對方生產中",
   completed: "已完成",
-  shipped: "已出貨",
+  rejected: "對方退回",
+  cancelled: "已取消",
 };
 
 function OutsourceInfo({ link }: { link: LinkRow | undefined }) {
@@ -984,8 +985,8 @@ const COST_TYPE_LABEL: Record<string, string> = {
 const SOURCE_TYPE_LABEL: Record<string, string> = {
   manual: "手動",
   purchase: "進貨",
+  inventory: "庫存領料",
   outsource: "外包",
-  task: "工序",
 };
 
 function num(v: number | string | null | undefined): number {
@@ -1035,9 +1036,7 @@ function CostsTab({
 
   if (sumErr || costErr) {
     return (
-      <p className="text-sm text-muted-foreground">
-        成本功能尚未啟用（{humanizeError(sumErr ?? costErr, "載入成本")}）
-      </p>
+      <p className="text-sm text-destructive">{humanizeError(sumErr ?? costErr, "載入成本")}</p>
     );
   }
 
