@@ -14,8 +14,12 @@ import {
   ArrowLeft,
   ChevronDown,
   RefreshCw,
+  CalendarDays,
+  Wallet,
 } from "lucide-react";
 import { AmendmentPanel } from "@/components/attendance/AmendmentPanel";
+import { LeavePanel } from "@/components/attendance/LeavePanel";
+import { PayslipPanel } from "@/components/attendance/PayslipPanel";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
@@ -32,8 +36,16 @@ export const Route = createFileRoute("/clock/")({
       { property: "og:description", content: "員工每日上下班打卡。" },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { amend?: string } =>
-    typeof search["amend"] === "string" ? { amend: search["amend"] } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { amend?: string; leave?: string; pay?: string } => {
+    const out: { amend?: string; leave?: string; pay?: string } = {};
+    for (const k of ["amend", "leave", "pay"] as const) {
+      const v = search[k];
+      if (typeof v === "string" || typeof v === "number") out[k] = String(v);
+    }
+    return out;
+  },
   component: ClockPage,
 });
 
@@ -114,8 +126,10 @@ function ClockPage() {
   const [confirmOut, setConfirmOut] = useState(false);
   const [geo, setGeo] = useState<Geo>({ state: "idle" });
   const [justDone, setJustDone] = useState<string | null>(null);
-  const { amend } = Route.useSearch();
+  const { amend, leave, pay } = Route.useSearch();
   const [amendOpen, setAmendOpen] = useState(!!amend);
+  const [leaveOpen, setLeaveOpen] = useState(!!leave);
+  const [payOpen, setPayOpen] = useState(!!pay);
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -511,6 +525,52 @@ function ClockPage() {
           {amendOpen && (
             <CardContent className="border-t pt-4">
               <AmendmentPanel />
+            </CardContent>
+          )}
+        </Card>
+
+        {/* 請假：在這頁直接展開 */}
+        <Card>
+          <button
+            type="button"
+            className="flex min-h-14 w-full items-center justify-between px-4 text-left"
+            onClick={() => setLeaveOpen((v) => !v)}
+            aria-expanded={leaveOpen}
+          >
+            <span className="flex items-center gap-2 text-base font-medium">
+              <CalendarDays className="h-5 w-5 text-muted-foreground" />
+              請假
+            </span>
+            <ChevronDown
+              className={`h-5 w-5 text-muted-foreground transition-transform ${leaveOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {leaveOpen && (
+            <CardContent className="border-t pt-4">
+              <LeavePanel />
+            </CardContent>
+          )}
+        </Card>
+
+        {/* 我的薪資條 */}
+        <Card>
+          <button
+            type="button"
+            className="flex min-h-14 w-full items-center justify-between px-4 text-left"
+            onClick={() => setPayOpen((v) => !v)}
+            aria-expanded={payOpen}
+          >
+            <span className="flex items-center gap-2 text-base font-medium">
+              <Wallet className="h-5 w-5 text-muted-foreground" />
+              我的薪資條
+            </span>
+            <ChevronDown
+              className={`h-5 w-5 text-muted-foreground transition-transform ${payOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {payOpen && (
+            <CardContent className="border-t pt-4">
+              <PayslipPanel />
             </CardContent>
           )}
         </Card>

@@ -17,6 +17,7 @@ interface Notification {
   is_read: boolean;
   ref_type: string | null;
   ref_id: string | null;
+  rule_code?: string | null;
   line_status: "sent" | "failed" | "pending" | null;
   created_at: string;
 }
@@ -42,6 +43,7 @@ const REF_ROUTE: Record<string, string> = {
   receivable: "/dashboard/receivables",
   employee: "/dashboard/settings/employees",
   quotation: "/dashboard/quotations",
+  leave_request: "/attendance",
 };
 
 /** 側欄鈴鐺＋通知中心下拉面板：未讀數、Realtime 訂閱、標記已讀、導航 */
@@ -148,6 +150,16 @@ export function NotificationBell() {
     if (n.ref_type === "order_task" && n.ref_id) {
       setOpen(false);
       navigate({ to: "/dashboard/orders/$orderId", params: { orderId: n.ref_id } });
+      return;
+    }
+    if (n.ref_type === "leave_request" && n.rule_code !== "leave_requested") {
+      setOpen(false);
+      navigate({ to: "/clock", search: { leave: "1" } });
+      return;
+    }
+    if (n.ref_type === "payroll") {
+      setOpen(false);
+      navigate({ to: "/clock", search: { pay: "1" } });
       return;
     }
     const to = n.ref_type ? REF_ROUTE[n.ref_type] : undefined;

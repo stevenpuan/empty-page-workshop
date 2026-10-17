@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { LeaveReviewTab } from "@/components/attendance/LeaveReviewTab";
 import { useAuth } from "@/lib/auth";
 import { humanizeError } from "@/lib/app-error";
 import { taipeiToday } from "@/lib/dates";
@@ -196,6 +197,7 @@ function AttendancePage() {
           <TabsList>
             <TabsTrigger value="daily">每日出勤</TabsTrigger>
             <TabsTrigger value="amend">補卡審核</TabsTrigger>
+            <TabsTrigger value="leave">請假審核</TabsTrigger>
             <TabsTrigger value="monthly">月報表</TabsTrigger>
           </TabsList>
 
@@ -204,6 +206,9 @@ function AttendancePage() {
           </TabsContent>
           <TabsContent value="amend" className="mt-4">
             <AmendTab />
+          </TabsContent>
+          <TabsContent value="leave" className="mt-4">
+            <LeaveReviewTab />
           </TabsContent>
           <TabsContent value="monthly" className="mt-4">
             <MonthlyTab />
