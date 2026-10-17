@@ -352,6 +352,7 @@ export type Database = {
           created_by: string | null
           id: string
           receivable_id: string
+          voided_at: string | null
         }
         Insert: {
           allocated_amount?: number
@@ -361,6 +362,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           receivable_id: string
+          voided_at?: string | null
         }
         Update: {
           allocated_amount?: number
@@ -370,6 +372,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           receivable_id?: string
+          voided_at?: string | null
         }
         Relationships: [
           {
@@ -404,6 +407,7 @@ export type Database = {
       }
       collections: {
         Row: {
+          allocated_amount: number
           amount: number
           bank_account: string | null
           check_due_date: string | null
@@ -414,14 +418,18 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_id: string
+          discount_amount: number
+          fee_amount: number
           id: string
           method: string
           note: string | null
           status: string
+          unallocated_amount: number | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          allocated_amount?: number
           amount?: number
           bank_account?: string | null
           check_due_date?: string | null
@@ -432,14 +440,18 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id: string
+          discount_amount?: number
+          fee_amount?: number
           id?: string
           method?: string
           note?: string | null
           status?: string
+          unallocated_amount?: number | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          allocated_amount?: number
           amount?: number
           bank_account?: string | null
           check_due_date?: string | null
@@ -450,10 +462,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string
+          discount_amount?: number
+          fee_amount?: number
           id?: string
           method?: string
           note?: string | null
           status?: string
+          unallocated_amount?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -1934,6 +1949,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_id: string | null
+          designer_id: string | null
           due_date: string | null
           id: string
           item_name: string
@@ -1957,6 +1973,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          designer_id?: string | null
           due_date?: string | null
           id?: string
           item_name: string
@@ -1980,6 +1997,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          designer_id?: string | null
           due_date?: string | null
           id?: string
           item_name?: string
@@ -2009,6 +2027,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_designer_id_fkey"
+            columns: ["designer_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {
@@ -2135,6 +2160,7 @@ export type Database = {
           id: string
           payable_id: string
           payment_id: string
+          voided_at: string | null
         }
         Insert: {
           allocated_amount?: number
@@ -2144,6 +2170,7 @@ export type Database = {
           id?: string
           payable_id: string
           payment_id: string
+          voided_at?: string | null
         }
         Update: {
           allocated_amount?: number
@@ -2153,6 +2180,7 @@ export type Database = {
           id?: string
           payable_id?: string
           payment_id?: string
+          voided_at?: string | null
         }
         Relationships: [
           {
@@ -2187,6 +2215,7 @@ export type Database = {
       }
       payments: {
         Row: {
+          allocated_amount: number
           amount: number
           bank_account: string | null
           check_due_date: string | null
@@ -2194,17 +2223,21 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          discount_amount: number
+          fee_amount: number
           id: string
           method: string
           note: string | null
           pay_date: string
           payment_no: string
           status: string
+          unallocated_amount: number | null
           updated_at: string
           updated_by: string | null
           vendor_id: string
         }
         Insert: {
+          allocated_amount?: number
           amount?: number
           bank_account?: string | null
           check_due_date?: string | null
@@ -2212,17 +2245,21 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          discount_amount?: number
+          fee_amount?: number
           id?: string
           method?: string
           note?: string | null
           pay_date?: string
           payment_no: string
           status?: string
+          unallocated_amount?: number | null
           updated_at?: string
           updated_by?: string | null
           vendor_id: string
         }
         Update: {
+          allocated_amount?: number
           amount?: number
           bank_account?: string | null
           check_due_date?: string | null
@@ -2230,12 +2267,15 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          discount_amount?: number
+          fee_amount?: number
           id?: string
           method?: string
           note?: string | null
           pay_date?: string
           payment_no?: string
           status?: string
+          unallocated_amount?: number | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string
@@ -2570,6 +2610,221 @@ export type Database = {
           ran_at?: string
         }
         Relationships: []
+      }
+      quick_job_files: {
+        Row: {
+          company_id: string | null
+          content_type: string | null
+          created_at: string
+          employee_id: string | null
+          id: string
+          job_id: string | null
+          line_user_id: string | null
+          storage_path: string
+        }
+        Insert: {
+          company_id?: string | null
+          content_type?: string | null
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          job_id?: string | null
+          line_user_id?: string | null
+          storage_path: string
+        }
+        Update: {
+          company_id?: string | null
+          content_type?: string | null
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          job_id?: string | null
+          line_user_id?: string | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_job_files_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_job_files_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_job_files_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "quick_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quick_jobs: {
+        Row: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount_total?: number | null
+          assigned_at?: string | null
+          assignee_id?: string | null
+          cancel_reason?: string | null
+          closed_at?: string | null
+          closed_by_employee_id?: string | null
+          collection_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by_employee_id?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          done_at?: string | null
+          id?: string
+          job_no: string
+          last_actor_id?: string | null
+          note?: string | null
+          pay_method?: string | null
+          pickup_at?: string | null
+          raw_text?: string | null
+          receivable_id?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          tax_id?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount_total?: number | null
+          assigned_at?: string | null
+          assignee_id?: string | null
+          cancel_reason?: string | null
+          closed_at?: string | null
+          closed_by_employee_id?: string | null
+          collection_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by_employee_id?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          done_at?: string | null
+          id?: string
+          job_no?: string
+          last_actor_id?: string | null
+          note?: string | null
+          pay_method?: string | null
+          pickup_at?: string | null
+          raw_text?: string | null
+          receivable_id?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          tax_id?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_jobs_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_closed_by_employee_id_fkey"
+            columns: ["closed_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_created_by_employee_id_fkey"
+            columns: ["created_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_last_actor_id_fkey"
+            columns: ["last_actor_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_jobs_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables_summary"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotation_items: {
         Row: {
@@ -2981,6 +3236,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
+          is_company_default: boolean
           is_default: boolean
           name: string
           product_category: string
@@ -2993,6 +3249,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
+          is_company_default?: boolean
           is_default?: boolean
           name: string
           product_category: string
@@ -3005,6 +3262,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
+          is_company_default?: boolean
           is_default?: boolean
           name?: string
           product_category?: string
@@ -3611,6 +3869,532 @@ export type Database = {
       }
     }
     Functions: {
+      _apply_collection_allocs: {
+        Args: { p_allocations: Json; p_collection_id: string }
+        Returns: number
+      }
+      _apply_payment_allocs: {
+        Args: { p_allocations: Json; p_payment_id: string }
+        Returns: number
+      }
+      _qj_assign: {
+        Args: { p_actor: string; p_assignee: string; p_job: string }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_cancel: {
+        Args: { p_actor: string; p_job: string; p_reason: string }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_create: {
+        Args: {
+          p_actor: string
+          p_assignee: string
+          p_company: string
+          p_customer_name: string
+          p_customer_phone: string
+          p_note: string
+          p_pickup_at: string
+          p_raw: string
+          p_source: string
+          p_title: string
+        }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_done: {
+        Args: { p_actor: string; p_job: string }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_get_for_update: {
+        Args: { p_actor: string; p_job: string }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_is_manager: { Args: { p_emp: string }; Returns: boolean }
+      _qj_json: {
+        Args: { p_job: Database["public"]["Tables"]["quick_jobs"]["Row"] }
+        Returns: Json
+      }
+      _qj_line_actor_for: {
+        Args: { p_company: string; p_line_user_id: string }
+        Returns: string
+      }
+      _qj_line_employees: {
+        Args: { p_line_user_id: string }
+        Returns: {
+          company_code: string
+          company_id: string
+          company_name: string
+          employee_id: string
+          employee_name: string
+          is_manager: boolean
+        }[]
+      }
+      _qj_line_find: {
+        Args: { p_line_user_id: string; p_ref: string }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_managers: { Args: { p_company: string }; Returns: string[] }
+      _qj_notify: {
+        Args: {
+          p_body: string
+          p_exclude: string
+          p_job_id: string
+          p_rule: string
+          p_targets: string[]
+          p_title: string
+        }
+        Returns: number
+      }
+      _qj_pickup: {
+        Args: {
+          p_actor: string
+          p_amount: number
+          p_job: string
+          p_method: string
+          p_note: string
+          p_tax_id: string
+        }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_start: {
+        Args: { p_actor: string; p_job: string }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_summary: {
+        Args: { p_job: Database["public"]["Tables"]["quick_jobs"]["Row"] }
+        Returns: string
+      }
+      _qj_update: {
+        Args: {
+          p_actor: string
+          p_customer_name: string
+          p_customer_phone: string
+          p_job: string
+          p_note: string
+          p_pickup_at: string
+          p_title: string
+        }
+        Returns: {
+          amount_total: number | null
+          assigned_at: string | null
+          assignee_id: string | null
+          cancel_reason: string | null
+          closed_at: string | null
+          closed_by_employee_id: string | null
+          collection_id: string | null
+          company_id: string
+          created_at: string
+          created_by_employee_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          done_at: string | null
+          id: string
+          job_no: string
+          last_actor_id: string | null
+          note: string | null
+          pay_method: string | null
+          pickup_at: string | null
+          raw_text: string | null
+          receivable_id: string | null
+          source: string
+          started_at: string | null
+          status: string
+          tax_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quick_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _qj_walkin_customer: { Args: { p_company: string }; Returns: string }
+      _qj_web_actor: { Args: never; Returns: string }
+      _task_announce: {
+        Args: {
+          p_exclude: string
+          p_task: Database["public"]["Tables"]["order_tasks"]["Row"]
+        }
+        Returns: undefined
+      }
+      _task_claim: {
+        Args: { p_actor: string; p_task: string }
+        Returns: {
+          assignee_id: string | null
+          blocked_reason: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          done_at: string | null
+          due_at: string | null
+          id: string
+          is_outsource: boolean
+          note: string | null
+          order_id: string
+          outsource_due_at: string | null
+          outsourced_at: string | null
+          purchase_id: string | null
+          started_at: string | null
+          station_id: string
+          status: string
+          step_no: number
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_tasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _task_finish: {
+        Args: { p_actor: string; p_task: string }
+        Returns: {
+          assignee_id: string | null
+          blocked_reason: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          done_at: string | null
+          due_at: string | null
+          id: string
+          is_outsource: boolean
+          note: string | null
+          order_id: string
+          outsource_due_at: string | null
+          outsourced_at: string | null
+          purchase_id: string | null
+          started_at: string | null
+          station_id: string
+          status: string
+          step_no: number
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_tasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _task_is_current: {
+        Args: { p_task: Database["public"]["Tables"]["order_tasks"]["Row"] }
+        Returns: boolean
+      }
+      _task_label: {
+        Args: { p_task: Database["public"]["Tables"]["order_tasks"]["Row"] }
+        Returns: string
+      }
+      _task_notify: {
+        Args: {
+          p_body: string
+          p_exclude: string
+          p_rule: string
+          p_targets: string[]
+          p_task: Database["public"]["Tables"]["order_tasks"]["Row"]
+          p_title: string
+        }
+        Returns: number
+      }
+      _task_result: {
+        Args: { p_t: Database["public"]["Tables"]["order_tasks"]["Row"] }
+        Returns: Json
+      }
       add_order_cost: {
         Args: {
           p_amount: number
@@ -3627,7 +4411,7 @@ export type Database = {
       }
       allocate_collection: {
         Args: {
-          p_allocations: Json
+          p_allocations?: Json
           p_amount: number
           p_bank_account?: string
           p_check_due_date?: string
@@ -3636,6 +4420,8 @@ export type Database = {
           p_company_id: string
           p_created_by?: string
           p_customer_id: string
+          p_discount_amount?: number
+          p_fee_amount?: number
           p_method: string
           p_note?: string
         }
@@ -3643,18 +4429,28 @@ export type Database = {
       }
       allocate_payment: {
         Args: {
-          p_allocations: Json
+          p_allocations?: Json
           p_amount: number
           p_bank_account?: string
           p_check_due_date?: string
           p_check_no?: string
           p_company_id: string
           p_created_by?: string
+          p_discount_amount?: number
+          p_fee_amount?: number
           p_method: string
           p_note?: string
           p_pay_date: string
           p_vendor_id: string
         }
+        Returns: Json
+      }
+      apply_collection: {
+        Args: { p_allocations: Json; p_collection_id: string }
+        Returns: Json
+      }
+      apply_payment: {
+        Args: { p_allocations: Json; p_payment_id: string }
         Returns: Json
       }
       approve_amendment: {
@@ -3693,6 +4489,28 @@ export type Database = {
           p_note?: string
           p_order_id: string
           p_receiver?: string
+        }
+        Returns: Json
+      }
+      create_manual_payable: {
+        Args: {
+          p_amount: number
+          p_due_date: string
+          p_invoice_no: string
+          p_note: string
+          p_related_order_id: string
+          p_vendor_id: string
+        }
+        Returns: Json
+      }
+      create_manual_receivable: {
+        Args: {
+          p_amount: number
+          p_customer_id: string
+          p_due_date: string
+          p_invoice_no: string
+          p_note: string
+          p_related_order_id: string
         }
         Returns: Json
       }
@@ -3758,12 +4576,16 @@ export type Database = {
           company_name: string
           month_order_amount: number
           month_orders: number
+          month_quick_amount: number
           month_shipped_amount: number
           outsourcing: number
           overdue_tasks: number
+          quick_open: number
           today_abnormal: number
           today_clock_in: number
           today_new_orders: number
+          today_quick_amount: number
+          today_quick_jobs: number
           wip_orders: number
         }[]
       }
@@ -3803,6 +4625,54 @@ export type Database = {
       is_manager: { Args: never; Returns: boolean }
       is_owner: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      line_quick_job_action: {
+        Args: {
+          p_action: string
+          p_assignee_id: string
+          p_job_ref: string
+          p_line_user_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      line_quick_job_add_file: {
+        Args: {
+          p_content_type: string
+          p_line_user_id: string
+          p_storage_path: string
+        }
+        Returns: Json
+      }
+      line_quick_job_create: {
+        Args: {
+          p_assignee_name: string
+          p_company_hint: string
+          p_customer_name: string
+          p_customer_phone: string
+          p_line_user_id: string
+          p_note: string
+          p_pickup_at: string
+          p_raw: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      line_quick_job_list: { Args: { p_line_user_id: string }; Returns: Json }
+      line_quick_job_pickup: {
+        Args: {
+          p_amount: number
+          p_job_ref: string
+          p_line_user_id: string
+          p_method: string
+          p_tax_id: string
+        }
+        Returns: Json
+      }
+      line_task_action: {
+        Args: { p_action: string; p_line_user_id: string; p_task_id: string }
+        Returns: Json
+      }
+      line_task_list: { Args: { p_line_user_id: string }; Returns: Json }
       login_companies: {
         Args: never
         Returns: {
@@ -3826,8 +4696,63 @@ export type Database = {
         Returns: string
       }
       notify_scan_all: { Args: never; Returns: number }
+      performance_stats: {
+        Args: { p_month: string }
+        Returns: {
+          avg_task_hours: number
+          employee_id: string
+          employee_name: string
+          quick_amount: number
+          quick_done: number
+          quick_on_time: number
+          tasks_done: number
+          tasks_on_time: number
+        }[]
+      }
       purge_maintenance: { Args: { p_dry_run?: boolean }; Returns: Json }
       purge_maintenance_job: { Args: never; Returns: undefined }
+      quick_job_assign: {
+        Args: { p_assignee_id: string; p_job_id: string }
+        Returns: Json
+      }
+      quick_job_cancel: {
+        Args: { p_job_id: string; p_reason: string }
+        Returns: Json
+      }
+      quick_job_create: {
+        Args: {
+          p_assignee_id: string
+          p_customer_name: string
+          p_customer_phone: string
+          p_note: string
+          p_pickup_at: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      quick_job_done: { Args: { p_job_id: string }; Returns: Json }
+      quick_job_pickup: {
+        Args: {
+          p_amount: number
+          p_job_id: string
+          p_method: string
+          p_note: string
+          p_tax_id: string
+        }
+        Returns: Json
+      }
+      quick_job_start: { Args: { p_job_id: string }; Returns: Json }
+      quick_job_update: {
+        Args: {
+          p_customer_name: string
+          p_customer_phone: string
+          p_job_id: string
+          p_note: string
+          p_pickup_at: string
+          p_title: string
+        }
+        Returns: Json
+      }
       refresh_line_bind_code: {
         Args: { p_employee_id: string }
         Returns: string
@@ -3864,7 +4789,9 @@ export type Database = {
         Args: { p_reason: string; p_task_id: string }
         Returns: Json
       }
+      task_claim: { Args: { p_task_id: string }; Returns: Json }
       task_done: { Args: { p_task_id: string }; Returns: Json }
+      task_finish: { Args: { p_task_id: string }; Returns: Json }
       task_skip: { Args: { p_task_id: string }; Returns: Json }
       task_start: { Args: { p_task_id: string }; Returns: Json }
       unbind_line_account: {
@@ -3882,6 +4809,24 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_payable_info: {
+        Args: {
+          p_due_date: string
+          p_invoice_no: string
+          p_note: string
+          p_payable_id: string
+        }
+        Returns: Json
+      }
+      update_receivable_info: {
+        Args: {
+          p_due_date: string
+          p_invoice_no: string
+          p_note: string
+          p_receivable_id: string
+        }
+        Returns: Json
+      }
       user_company_ids: { Args: never; Returns: string[] }
       verify_internal_push_key: { Args: { p_key: string }; Returns: boolean }
       void_collection: { Args: { p_collection_id: string }; Returns: Json }
@@ -3889,8 +4834,16 @@ export type Database = {
         Args: { p_delivery_id: string; p_reason?: string }
         Returns: Json
       }
+      void_payable: {
+        Args: { p_payable_id: string; p_reason: string }
+        Returns: Json
+      }
       void_payment: { Args: { p_payment_id: string }; Returns: Json }
       void_purchase: { Args: { p_purchase_id: string }; Returns: Json }
+      void_receivable: {
+        Args: { p_reason: string; p_receivable_id: string }
+        Returns: Json
+      }
       write_audit: {
         Args: {
           p_action: string
@@ -3901,6 +4854,14 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      write_off_payable: {
+        Args: { p_amount: number; p_payable_id: string; p_reason: string }
+        Returns: Json
+      }
+      write_off_receivable: {
+        Args: { p_amount: number; p_reason: string; p_receivable_id: string }
+        Returns: Json
       }
     }
     Enums: {
